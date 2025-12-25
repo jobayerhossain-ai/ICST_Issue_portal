@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="bn">
+
+<head>
+    <meta charset="UTF-8">
+</head>
+
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background: #f4f4f4;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background: #f4f4f4; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0"
+                    style="background: #fff; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <tr>
+                        <td
+                            style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 30px; text-align: center;">
+                            <h1 style="color: #fff; margin: 0;">🔔 ইস্যু আপডেট!</h1>
+                            <h2 style="color: #fff; margin: 10px 0 0 0; font-weight: normal;">Issue Status Update</h2>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <h3 style="color: #333;">হ্যালো {{.Name}}!</h3>
+                            <p style="color: #666; line-height: 1.6;">
+                                আপনার issue এর status পরিবর্তন হয়েছে।
+                            </p>
+                            <div
+                                style="background: #faf5ff; border-left: 4px solid #8b5cf6; padding: 20px; margin: 25px 0;">
+                                <p style="margin: 0 0 10px 0; color: #333;"><strong>Issue:</strong> {{.IssueTitle}}</p>
+                                <div style="display: flex; align-items: center; margin: 15px 0;">
+                                    <span
+                                        style="background: #fee2e2; color: #991b1b; padding: 5px 15px; border-radius: 15px; font-size: 14px;">{{.OldStatus}}</span>
+                                    <span style="margin: 0 10px; color: #8b5cf6;">→</span>
+                                    <span
+                                        style="background: #dcfce7; color: #166534; padding: 5px 15px; border-radius: 15px; font-size: 14px;">{{.NewStatus}}</span>
+                                </div>
+                                <p style="margin: 10px 0 0 0; color: #999; font-size: 14px;">Issue ID: #{{.IssueID}}</p>
+                            </div>
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="{{.IssueURL}}"
+                                    style="display: inline-block; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: #fff; text-decoration: none; padding: 12px 30px; border-radius: 50px; font-weight: bold;">
+                                    View Issue Details →
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td
+                            style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
+                            <p style="color: #999; font-size: 12px; margin: 0;">© 2025 ICST Issue Portal</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>
