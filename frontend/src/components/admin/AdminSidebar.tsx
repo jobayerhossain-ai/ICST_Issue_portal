@@ -3,7 +3,15 @@ import {
   FileText,
   PlusCircle,
   BarChart3,
-  LogOut
+  LogOut,
+  Users,
+  Shield,
+  MessageSquare,
+  Bell,
+  Settings,
+  BookOpen,
+  BarChart,
+  Lock
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -22,10 +30,20 @@ import {
 
 const menuItems = [
   { title: 'Dashboard', url: '/admin/dashboard', icon: LayoutDashboard },
-  { title: 'Pending Issues', url: '/admin/pending', icon: FileText },
+  { title: 'Issues Filter', url: '/admin/manage-issues', icon: FileText },
   { title: 'Add Issue', url: '/admin/add-issue', icon: PlusCircle },
-  { title: 'Manage Issues', url: '/admin/manage-issues', icon: FileText },
+  { title: 'Pending Issues', url: '/admin/pending', icon: BarChart3 },
   { title: 'Vote Monitor', url: '/admin/vote-monitor', icon: BarChart3 },
+  { title: 'User Management', url: '/admin/users', icon: Users },
+  { title: 'Staff Management', url: '/admin/staff', icon: Shield },
+  { title: 'Communications', url: '/admin/communications', icon: MessageSquare },
+  { title: 'Bulk Email', url: '/admin/bulk-email', icon: Bell },
+  { title: 'Emergency Control', url: '/admin/emergency', icon: Lock },
+  // Placeholders for future features
+  { title: 'Reports & Analytics', url: '/admin/reports', icon: BarChart },
+  { title: 'System Config', url: '/admin/config', icon: Settings },
+  { title: 'Audit Logs', url: '/admin/audit', icon: FileText },
+  { title: 'Knowledge Base', url: '/admin/kb', icon: BookOpen },
 ];
 
 export function AdminSidebar() {

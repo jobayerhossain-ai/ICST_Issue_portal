@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'https://icst-issue-portal.onrender.com/api';
+const API_URL = 'https://backend-node-gamma-one.vercel.app/api';
 
 const api = axios.create({
     baseURL: API_URL,

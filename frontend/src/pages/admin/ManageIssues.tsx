@@ -11,7 +11,7 @@ interface Issue {
     description: string;
     status: string;
     category: string;
-    votes: number;
+    votes: number | { good: number; bad: number };
     createdAt: string;
 }
 
@@ -99,7 +99,7 @@ const ManageIssues = () => {
                                                 <option value="in-progress">প্রসেসিং</option>
                                                 <option value="resolved">সমাধান</option>
                                             </select>
-                                            <span className="text-gray-500">👍 {issue.votes}</span>
+                                            <span className="text-gray-500">👍 {typeof issue.votes === 'number' ? issue.votes : (issue.votes?.good || 0)}</span>
                                         </div>
                                     </div>
 

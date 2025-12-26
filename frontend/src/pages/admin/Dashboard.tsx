@@ -18,6 +18,8 @@ interface Stats {
     weekCount: number;
     avgResolutionTime: number;
     criticalCount: number;
+    totalUsers?: number;
+    activeUsers?: number;
 }
 
 const Dashboard = () => {
@@ -32,60 +34,15 @@ const Dashboard = () => {
         criticalCount: 0
     });
     const [loading, setLoading] = useState(true);
-    const [alerts, setAlerts] = useState([
-        {
-            id: '1',
-            type: 'critical' as const,
-            title: 'জরুরি ইস্যু',
-            message: '৩টি critical priority ইস্যু ২৪ ঘন্টার বেশি সময় pending আছে',
-            timestamp: new Date()
-        },
-        {
-            id: '2',
-            type: 'warning' as const,
-            title: 'SLA সতর্কতা',
-            message: 'Library Issue #245 এর response time শীঘ্রই exceed হবে',
-            issueId: '245',
-            timestamp: new Date()
-        }
-    ]);
+    const [alerts, setAlerts] = useState<any[]>([]);
 
-    const [activities, setActivities] = useState([
-        {
-            id: '1',
-            type: 'new_issue' as const,
-            title: 'নতুন ইস্যু সাবমিট হয়েছে',
-            description: 'Canteen Food Quality - Priority: High',
-            user: 'Student #2021-1-60-100',
-            timestamp: new Date(Date.now() - 5 * 60000)
-        },
-        {
-            id: '2',
-            type: 'status_change' as const,
-            title: 'ইস্যু স্ট্যাটাস আপডেট',
-            description: 'Library AC Problem → In Progress',
-            user: 'Admin',
-            timestamp: new Date(Date.now() - 15 * 60000)
-        },
-        {
-            id: '3',
-            type: 'issue_resolved' as const,
-            title: 'ইস্যু সমাধান সম্পন্ন',
-            description: 'Wifi Connection Issue → Resolved',
-            user: 'Admin',
-            timestamp: new Date(Date.now() - 30 * 60000)
-        },
-        {
-            id: '4',
-            type: 'user_signup' as const,
-            title: 'নতুন ইউজার রেজিস্ট্রেশন',
-            description: 'Roll: 2021-1-60-150',
-            timestamp: new Date(Date.now() - 60 * 60000)
-        },
-    ]);
+    const [activities, setActivities] = useState<any[]>([]); // Using any for flexibility with backend response
+    const [healthStatus, setHealthStatus] = useState('healthy');
 
     useEffect(() => {
         fetchStats();
+        fetchActivities();
+        checkHealth();
     }, []);
 
     const fetchStats = async () => {
@@ -93,9 +50,28 @@ const Dashboard = () => {
             const { data } = await api.get('/admin/stats');
             setStats(data);
         } catch (error) {
+            console.error('Failed to load stats', error);
             toast.error('ডেটা লোড করতে সমস্যা হয়েছে');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchActivities = async () => {
+        try {
+            const { data } = await api.get('/admin/activity');
+            setActivities(data);
+        } catch (error) {
+            console.error('Failed to load activity', error);
+        }
+    };
+
+    const checkHealth = async () => {
+        try {
+            await api.get('/health');
+            setHealthStatus('healthy');
+        } catch (error) {
+            setHealthStatus('degraded');
         }
     };
 
@@ -157,8 +133,8 @@ const Dashboard = () => {
             {/* System Health */}
             <div className="mb-6">
                 <HealthIndicator
-                    status="healthy"
-                    message="সব সার্ভিস স্বাভাবিক অবস্থায় চলছে"
+                    status={healthStatus === 'healthy' ? 'healthy' : healthStatus === 'degraded' ? 'warning' : 'error'}
+                    message={healthStatus === 'healthy' ? "সব সার্ভিস স্বাভাবিক অবস্থায় চলছে" : "সার্ভারে সমস্যা দেখা দিচ্ছে"}
                 />
             </div>
 
@@ -201,19 +177,23 @@ const Dashboard = () => {
                     <div className="space-y-4">
                         <div className="flex items-center justify-between p-3 bg-sky-50 rounded-lg">
                             <span className="text-sm font-medium text-gray-700">মোট ইউজার</span>
-                            <span className="text-lg font-bold text-sky-600">248</span>
+                            <span className="text-lg font-bold text-sky-600">{stats.totalUsers || 0}</span>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
                             <span className="text-sm font-medium text-gray-700">সক্রিয় ইউজার</span>
-                            <span className="text-lg font-bold text-purple-600">142</span>
+                            <span className="text-lg font-bold text-purple-600">{stats.activeUsers || 0}</span>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                             <span className="text-sm font-medium text-gray-700">সমাধান হার</span>
-                            <span className="text-lg font-bold text-green-600">87%</span>
+                            <span className="text-lg font-bold text-green-600">
+                                {stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0}%
+                            </span>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                             <span className="text-sm font-medium text-gray-700">গড় Response</span>
-                            <span className="text-lg font-bold text-orange-600">2.4h</span>
+                            <span className="text-lg font-bold text-orange-600">
+                                {stats.avgResolutionTime > 0 ? `${stats.avgResolutionTime}h` : 'N/A'}
+                            </span>
                         </div>
                     </div>
                 </div>

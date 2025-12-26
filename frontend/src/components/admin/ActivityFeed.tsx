@@ -24,7 +24,10 @@ const ActivityFeed = ({ activities }: ActivityFeedProps) => {
         }
     };
 
-    const getTimeAgo = (date: Date) => {
+    const getTimeAgo = (dateInput: Date | string) => {
+        const date = new Date(dateInput);
+        if (isNaN(date.getTime())) return '';
+
         const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
 
         if (seconds < 60) return 'এইমাত্র';

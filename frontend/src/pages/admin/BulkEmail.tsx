@@ -8,7 +8,8 @@ import api from '@/services/api';
 const BulkEmail = () => {
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
-    const [recipients, setRecipients] = useState<'all' | 'students'>('all');
+    const [recipients, setRecipients] = useState<'all' | 'students' | 'custom'>('all');
+    const [customEmails, setCustomEmails] = useState('');
     const [preview, setPreview] = useState(false);
     const [sending, setSending] = useState(false);
 
@@ -18,6 +19,24 @@ const BulkEmail = () => {
             return;
         }
 
+        // Validate custom emails if custom mode
+        if (recipients === 'custom') {
+            if (!customEmails.trim()) {
+                toast.error('Email addresses দিন');
+                return;
+            }
+
+            const emails = customEmails.split(',').map(e => e.trim()).filter(e => e);
+            const invalidEmails = emails.filter(email => !email.includes('@'));
+
+            if (invalidEmails.length > 0) {
+                toast.error('Invalid email addresses পাওয়া গেছে', {
+                    description: 'সব email addresses ঠিক আছে কিনা check করুন'
+                });
+                return;
+            }
+        }
+
         setSending(true);
 
         try {
@@ -25,6 +44,7 @@ const BulkEmail = () => {
                 subject,
                 body,
                 recipients,
+                customEmails: recipients === 'custom' ? customEmails : undefined,
             });
 
             toast.success('✅ ব্রডকাস্ট সফল!', {
@@ -34,6 +54,7 @@ const BulkEmail = () => {
             // Reset form
             setSubject('');
             setBody('');
+            setCustomEmails('');
         } catch (err: unknown) {
             const error = err as { response?: { data?: { message?: string } } };
             toast.error('Failed to send', {
@@ -85,10 +106,10 @@ ${body || 'Email body will appear here...'}
                             {/* Recipients */}
                             <div>
                                 <label className="block text-sm font-medium mb-2">Recipients</label>
-                                <div className="flex gap-3">
+                                <div className="grid grid-cols-3 gap-3">
                                     <button
                                         onClick={() => setRecipients('all')}
-                                        className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${recipients === 'all'
+                                        className={`py-2 px-4 rounded-lg font-medium transition-colors ${recipients === 'all'
                                             ? 'bg-sky-600 text-white'
                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                             }`}
@@ -98,7 +119,7 @@ ${body || 'Email body will appear here...'}
                                     </button>
                                     <button
                                         onClick={() => setRecipients('students')}
-                                        className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${recipients === 'students'
+                                        className={`py-2 px-4 rounded-lg font-medium transition-colors ${recipients === 'students'
                                             ? 'bg-purple-600 text-white'
                                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                             }`}
@@ -106,8 +127,37 @@ ${body || 'Email body will appear here...'}
                                         <FileText className="w-4 h-4 inline mr-2" />
                                         Students Only
                                     </button>
+                                    <button
+                                        onClick={() => setRecipients('custom')}
+                                        className={`py-2 px-4 rounded-lg font-medium transition-colors ${recipients === 'custom'
+                                            ? 'bg-green-600 text-white'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                    >
+                                        <Send className="w-4 h-4 inline mr-2" />
+                                        Custom
+                                    </button>
                                 </div>
                             </div>
+
+                            {/* Custom Email Input - Show only when custom is selected */}
+                            {recipients === 'custom' && (
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <label className="block text-sm font-medium mb-2 text-green-800">
+                                        📧 Custom Email Addresses
+                                    </label>
+                                    <textarea
+                                        value={customEmails}
+                                        onChange={(e) => setCustomEmails(e.target.value)}
+                                        rows={4}
+                                        placeholder="email1@example.com, email2@example.com, email3@example.com..."
+                                        className="w-full px-4 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 bg-white"
+                                    />
+                                    <p className="text-xs text-green-700 mt-2">
+                                        💡 Multiple emails দিতে comma (,) দিয়ে আলাদা করুন। Example: user1@gmail.com, user2@gmail.com
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Subject */}
                             <div>

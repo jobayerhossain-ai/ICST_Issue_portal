@@ -33,6 +33,11 @@ import UserManagement from "./pages/admin/UserManagement";
 import StaffManagement from "./pages/admin/StaffManagement";
 import CommunicationCenter from "./pages/admin/CommunicationCenter";
 import BulkEmail from "./pages/admin/BulkEmail";
+import ComingSoon from "./pages/admin/ComingSoon";
+import AuditLogs from "./pages/admin/AuditLogs";
+import SystemConfig from "./pages/admin/SystemConfig";
+import ReportsAnalytics from "./pages/admin/ReportsAnalytics";
+import KnowledgeBase from "./pages/admin/KnowledgeBase";
 
 import UserRegister from "./pages/user/UserRegister";
 import UserLogin from "./pages/user/UserLogin";
@@ -174,6 +179,11 @@ const App = () => (
               <Route path="staff" element={<StaffManagement />} />
               <Route path="communications" element={<CommunicationCenter />} />
               <Route path="bulk-email" element={<BulkEmail />} />
+
+              <Route path="reports" element={<ReportsAnalytics />} />
+              <Route path="config" element={<SystemConfig />} />
+              <Route path="audit" element={<AuditLogs />} />
+              <Route path="kb" element={<KnowledgeBase />} />
 
             </Route>
 

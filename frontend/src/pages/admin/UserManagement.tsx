@@ -24,52 +24,24 @@ const UserManagement = () => {
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [roleFilter, setRoleFilter] = useState('all');
 
+    // Modal states
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [showStatsModal, setShowStatsModal] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [userStats, setUserStats] = useState<any>(null);
+    const [loadingStats, setLoadingStats] = useState(false);
+
     useEffect(() => {
         fetchUsers();
     }, []);
 
     const fetchUsers = async () => {
         try {
-            // TODO: Replace with actual API endpoint
             const { data } = await api.get('/admin/users');
             setUsers(data);
         } catch (error) {
-            // Demo data for now
-            setUsers([
-                {
-                    _id: '1',
-                    name: 'Ahmed Hassan',
-                    email: 'ahmed@icst.edu',
-                    roll: '2021-1-60-100',
-                    department: 'CSE',
-                    role: 'user',
-                    isBlocked: false,
-                    createdAt: new Date().toISOString(),
-                    issueCount: 5
-                },
-                {
-                    _id: '2',
-                    name: 'Fatima Rahman',
-                    email: 'fatima@icst.edu',
-                    roll: '2021-1-60-101',
-                    department: 'EEE',
-                    role: 'user',
-                    isBlocked: false,
-                    createdAt: new Date().toISOString(),
-                    issueCount: 3
-                },
-                {
-                    _id: '3',
-                    name: 'Karim Islam',
-                    email: 'karim@icst.edu',
-                    roll: '2021-1-60-102',
-                    department: 'CSE',
-                    role: 'user',
-                    isBlocked: true,
-                    createdAt: new Date().toISOString(),
-                    issueCount: 12
-                },
-            ]);
+            console.error(error);
+            toast.error('ইউজার লিস্ট লোড করা যায়নি');
         } finally {
             setLoading(false);
         }
@@ -77,7 +49,7 @@ const UserManagement = () => {
 
     const handleBlockToggle = async (userId: string, isBlocked: boolean) => {
         try {
-            // TODO: API call
+            await api.patch(`/admin/users/${userId}/block`);
             setUsers(prev => prev.map(u =>
                 u._id === userId ? { ...u, isBlocked: !isBlocked } : u
             ));
@@ -88,11 +60,34 @@ const UserManagement = () => {
     };
 
     const handlePasswordReset = async (userId: string, email: string) => {
+        if (!confirm(`Are you sure you want to reset password for ${email}? Default will be 123456.`)) return;
+
         try {
-            // TODO: API call
-            toast.success(`পাসওয়ার্ড রিসেট লিংক ${email} এ পাঠানো হয়েছে`);
+            await api.post(`/admin/users/${userId}/reset-password`);
+            toast.success(`পাসওয়ার্ড রিসেট হয়েছে: 123456`);
         } catch (error) {
             toast.error('পাসওয়ার্ড রিসেট সফল হয়নি');
+        }
+    };
+
+    const handleViewDetails = (user: User) => {
+        setSelectedUser(user);
+        setShowDetailsModal(true);
+    };
+
+    const handleViewStats = async (user: User) => {
+        setSelectedUser(user);
+        setShowStatsModal(true);
+        setLoadingStats(true);
+
+        try {
+            const { data } = await api.get(`/admin/users/${user._id}/stats`);
+            setUserStats(data);
+        } catch (error) {
+            console.error(error);
+            toast.error('পরিসংখ্যান লোড করা যায়নি');
+        } finally {
+            setLoadingStats(false);
         }
     };
 
@@ -253,8 +248,8 @@ const UserManagement = () => {
                                                     <button
                                                         onClick={() => handleBlockToggle(user._id, user.isBlocked || false)}
                                                         className={`p-2 rounded-lg transition-colors ${user.isBlocked
-                                                                ? 'text-green-600 hover:bg-green-50'
-                                                                : 'text-red-600 hover:bg-red-50'
+                                                            ? 'text-green-600 hover:bg-green-50'
+                                                            : 'text-red-600 hover:bg-red-50'
                                                             }`}
                                                         title={user.isBlocked ? 'আনব্লক করুন' : 'ব্লক করুন'}
                                                     >
@@ -268,12 +263,14 @@ const UserManagement = () => {
                                                         <Key className="w-4 h-4" />
                                                     </button>
                                                     <button
+                                                        onClick={() => handleViewDetails(user)}
                                                         className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                                                         title="বিস্তারিত দেখুন"
                                                     >
                                                         <Eye className="w-4 h-4" />
                                                     </button>
                                                     <button
+                                                        onClick={() => handleViewStats(user)}
                                                         className="p-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
                                                         title="পরিসংখ্যান"
                                                     >
@@ -289,6 +286,153 @@ const UserManagement = () => {
                     )}
                 </CardContent>
             </Card>
+
+            {/* User Details Modal */}
+            {showDetailsModal && selectedUser && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-2xl font-bold text-gray-800">ইউজার বিস্তারিত</h2>
+                                <button
+                                    onClick={() => setShowDetailsModal(false)}
+                                    className="text-gray-500 hover:text-gray-700"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <p className="text-sm text-gray-600">নাম</p>
+                                        <p className="font-semibold">{selectedUser.name}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">রোল</p>
+                                        <p className="font-semibold">{selectedUser.roll}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">ইমেইল</p>
+                                        <p className="font-semibold">{selectedUser.email}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">ডিপার্টমেন্ট</p>
+                                        <p className="font-semibold">{selectedUser.department}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">Role</p>
+                                        <p className="font-semibold capitalize">{selectedUser.role}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">স্ট্যাটাস</p>
+                                        <p className="font-semibold">
+                                            {selectedUser.isBlocked ? (
+                                                <span className="text-red-600">Blocked</span>
+                                            ) : (
+                                                <span className="text-green-600">Active</span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">মোট ইস্যু</p>
+                                        <p className="font-semibold">{selectedUser.issueCount || 0}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">রেজিস্ট্রেশন তারিখ</p>
+                                        <p className="font-semibold">
+                                            {new Date(selectedUser.createdAt).toLocaleDateString('bn-BD')}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 flex justify-end">
+                                <button
+                                    onClick={() => setShowDetailsModal(false)}
+                                    className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700"
+                                >
+                                    বন্ধ করুন
+                                </button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* User Statistics Modal */}
+            {showStatsModal && selectedUser && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-2xl font-bold text-gray-800">
+                                    {selectedUser.name} - পরিসংখ্যান
+                                </h2>
+                                <button
+                                    onClick={() => setShowStatsModal(false)}
+                                    className="text-gray-500 hover:text-gray-700"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            {loadingStats ? (
+                                <div className="text-center py-12">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
+                                    <p className="text-gray-600">লোড হচ্ছে...</p>
+                                </div>
+                            ) : userStats ? (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="bg-blue-50 p-4 rounded-lg">
+                                            <p className="text-sm text-gray-600">মোট ইস্যু</p>
+                                            <p className="text-2xl font-bold text-blue-600">{userStats.total || 0}</p>
+                                        </div>
+                                        <div className="bg-yellow-50 p-4 rounded-lg">
+                                            <p className="text-sm text-gray-600">পেন্ডিং</p>
+                                            <p className="text-2xl font-bold text-yellow-600">{userStats.pending || 0}</p>
+                                        </div>
+                                        <div className="bg-purple-50 p-4 rounded-lg">
+                                            <p className="text-sm text-gray-600">প্রসেসিং</p>
+                                            <p className="text-2xl font-bold text-purple-600">{userStats.inProgress || 0}</p>
+                                        </div>
+                                        <div className="bg-green-50 p-4 rounded-lg">
+                                            <p className="text-sm text-gray-600">সমাধান</p>
+                                            <p className="text-2xl font-bold text-green-600">{userStats.resolved || 0}</p>
+                                        </div>
+                                    </div>
+
+                                    {userStats.categoryBreakdown && userStats.categoryBreakdown.length > 0 && (
+                                        <div className="mt-6">
+                                            <h3 className="font-semibold text-gray-800 mb-3">ক্যাটেগরি অনুযায়ী</h3>
+                                            <div className="space-y-2">
+                                                {userStats.categoryBreakdown.map((cat: any) => (
+                                                    <div key={cat.category} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                                        <span className="text-sm">{cat.category}</span>
+                                                        <span className="font-semibold">{cat.count}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-center text-gray-500 py-8">কোন ডেটা পাওয়া যায়নি</p>
+                            )}
+
+                            <div className="mt-6 flex justify-end">
+                                <button
+                                    onClick={() => setShowStatsModal(false)}
+                                    className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700"
+                                >
+                                    বন্ধ করুন
+                                </button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 };

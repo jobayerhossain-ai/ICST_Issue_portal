@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Paperclip, Users, MessageSquare, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
+import api from '@/services/api';
 
 interface Message {
     id: string;
@@ -16,26 +17,30 @@ interface Message {
 
 const CommunicationCenter = () => {
     const [activeTab, setActiveTab] = useState<'inbox' | 'compose' | 'broadcast' | 'templates'>('inbox');
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: '1',
-            from: 'Student #2021-1-60-100',
-            to: 'Admin',
-            subject: 'Library Issue Update প্রয়োজন',
-            message: 'আমার issue এর response কবে পাব?',
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-            read: false
-        },
-        {
-            id: '2',
-            from: 'Student #2021-1-60-101',
-            to: 'Admin',
-            subject: 'Thank you for quick resolution',
-            message: 'Very fast response! Great work.',
-            timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-            read: true
-        },
-    ]);
+    const [messages, setMessages] = useState<Message[]>([]);
+
+    useEffect(() => {
+        if (activeTab === 'inbox') {
+            fetchMessages();
+        }
+    }, [activeTab]);
+
+    const fetchMessages = async () => {
+        try {
+            const { data } = await api.get('/messages');
+            // Backend returns date string, need to parse to Date object for UI
+            const parsed = data.map((msg: any) => ({
+                ...msg,
+                id: msg._id,
+                timestamp: new Date(msg.createdAt),
+                from: msg.from?.name || 'Unknown'
+            }));
+            setMessages(parsed);
+        } catch (error) {
+            console.error(error);
+            toast.error('মেসেজ লোড করা যায়নি');
+        }
+    };
 
     const [composeData, setComposeData] = useState({
         to: '',
@@ -67,27 +72,44 @@ const CommunicationCenter = () => {
         },
     ];
 
-    const handleSendMessage = () => {
+    const handleSendMessage = async () => {
         if (!composeData.to || !composeData.subject || !composeData.message) {
             toast.error('সব ফিল্ড পূরণ করুন');
             return;
         }
 
-        toast.success('মেসেজ পাঠানো হয়েছে');
-        setComposeData({ to: '', subject: '', message: '' });
-        setActiveTab('inbox');
+        try {
+            await api.post('/messages', {
+                // to: composeData.to, // For now ignoring 'to' mapping logic in this demo
+                subject: composeData.subject,
+                message: composeData.message,
+                type: 'direct'
+            });
+            toast.success('মেসেজ পাঠানো হয়েছে');
+            setComposeData({ to: '', subject: '', message: '' });
+            setActiveTab('inbox');
+        } catch (error) {
+            toast.error('মেসেজ পাঠাতে সমস্যা হয়েছে');
+        }
     };
 
-    const handleBroadcast = () => {
+    const handleBroadcast = async () => {
         if (!broadcastData.title || !broadcastData.message) {
             toast.error('Title এবং Message পূরণ করুন');
             return;
         }
 
-        toast.success('ব্রডকাস্ট সফলভাবে পাঠানো হয়েছে', {
-            description: `${broadcastData.target === 'all' ? 'সব ইউজার' : 'Selected group'} এ পাঠানো হয়েছে`
-        });
-        setBroadcastData({ title: '', message: '', target: 'all' });
+        try {
+            await api.post('/admin/send-bulk-email', {
+                title: broadcastData.title,
+                message: broadcastData.message,
+                target: broadcastData.target
+            });
+            toast.success('ব্রডকাস্ট সফলভাবে পাঠানো হয়েছে');
+            setBroadcastData({ title: '', message: '', target: 'all' });
+        } catch (error) {
+            toast.error('ব্রডকাস্ট পাঠাতে সমস্যা হয়েছে');
+        }
     };
 
     const applyTemplate = (template: typeof templates[0]) => {

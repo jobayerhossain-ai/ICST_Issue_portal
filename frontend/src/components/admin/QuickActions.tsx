@@ -23,7 +23,7 @@ const QuickActions = () => {
             icon: FileText,
             label: 'রিপোর্ট দেখুন',
             engLabel: 'View Reports',
-            to: '/admin/analytics',
+            to: '/admin/reports',
             color: 'from-green-500 to-green-600',
             hoverColor: 'hover:from-green-600 hover:to-green-700'
         },
