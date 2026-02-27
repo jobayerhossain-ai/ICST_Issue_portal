@@ -12,7 +12,7 @@ const createTransporter = () => {
         }
     };
 
-    return nodemailer.createTransporter(config);
+    return nodemailer.createTransport(config);
 };
 
 // Email Templates
