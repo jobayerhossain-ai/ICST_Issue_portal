@@ -1835,14 +1835,10 @@ app.post('/api/admin/send-email', authenticateToken, requireAdmin, async (req, r
         // Remove duplicates
         const uniqueEmails = [...new Set(emailList)];
 
-        // Send emails in the background to avoid Vercel timeout (10s limit)
-        sendBulkEmails(uniqueEmails, 'bulkEmail', { subject, body })
-            .then(results => {
-                console.log(`📧 Background email batch finished: ${results.sent} sent, ${results.failed} failed`);
-            })
-            .catch(err => {
-                console.error('❌ Background email batch error:', err);
-            });
+        // AWAIT the sendEmails to ensure the serverless function doesn't kill the process early
+        // Vercel kills all background tasks once the response is sent.
+        const results = await sendBulkEmails(uniqueEmails, 'bulkEmail', { subject, body });
+        console.log(`📧 Email batch finished: ${results.sent} sent, ${results.failed} failed`);
 
         // Audit log (immediate)
         await db.insert(auditLogs).values({

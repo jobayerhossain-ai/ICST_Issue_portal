@@ -116,10 +116,11 @@ const CommunicationCenter = () => {
                 body: emailBody,
                 manualEmails: manualEmailList
             });
-            toast.success(`✅ ${data.success} জনকে ইমেইল পাঠানো হয়েছে${data.failed > 0 ? ` (${data.failed} ব্যর্থ)` : ''}`);
+            toast.success(data.message || '✅ ইমেইল পাঠানো শুরু হয়েছে');
             setEmailSubject(''); setEmailBody(''); setEmailSelectedUsers([]); setManualEmails('');
         } catch (err: any) {
-            toast.error(err.response?.data?.message || 'ইমেইল পাঠাতে ব্যর্থ');
+            const errMsg = err.response?.data?.error || err.response?.data?.message || 'ইমেইল পাঠাতে ব্যর্থ';
+            toast.error(errMsg, { duration: 5000 });
         } finally {
             setEmailSending(false);
         }

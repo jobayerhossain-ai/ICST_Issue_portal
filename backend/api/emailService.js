@@ -15,13 +15,16 @@ const createTransporter = () => {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASSWORD
         },
+        pool: true, // Use SMTP connection pooling
+        maxConnections: 5,
+        maxMessages: 100,
         tls: {
             rejectUnauthorized: false
         },
-        // IMPORTANT: Timeouts to prevent hanging
-        connectionTimeout: 10000, // 10s
-        greetingTimeout: 10000,
-        socketTimeout: 15000,
+        // Strict timeouts to avoid hanging serverless functions
+        connectionTimeout: 10000,
+        greetingTimeout: 15000,
+        socketTimeout: 20000,
         logger: process.env.EMAIL_DEBUG === 'true',
         debug: process.env.EMAIL_DEBUG === 'true'
     };
@@ -288,7 +291,11 @@ const sendEmail = async (to, template, data) => {
             from: `"ICST Issue Portal" <${process.env.EMAIL_USER}>`,
             to,
             subject,
-            html
+            html,
+            envelope: {
+                from: process.env.EMAIL_USER, // Enforce strict envelope from
+                to: to
+            }
         };
 
         const info = await transporter.sendMail(mailOptions);
