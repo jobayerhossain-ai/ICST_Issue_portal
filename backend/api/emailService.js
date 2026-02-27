@@ -237,23 +237,38 @@ const sendEmail = async (to, template, data) => {
             return { success: false, message: 'Email not configured' };
         }
 
-        const transporter = createTransporter();
-        const templateData = typeof template === 'function'
-            ? template(...data)
-            : template;
+        const transporter = createTransport();
+
+        // Handle template lookup if a string name is provided
+        let subject, html;
+        if (typeof template === 'function') {
+            const result = template(...data);
+            subject = result.subject;
+            html = result.html;
+        } else if (typeof template === 'string' && emailTemplates[template]) {
+            // If data is an object with subject/body, pass them
+            const result = emailTemplates[template](data.subject, data.body);
+            subject = result.subject;
+            html = result.html;
+        } else {
+            throw new Error(`Invalid template: ${template}`);
+        }
 
         const mailOptions = {
             from: `"ICST Issue Portal" <${process.env.EMAIL_USER}>`,
             to,
-            subject: templateData.subject,
-            html: templateData.html
+            subject,
+            html
         };
 
         const info = await transporter.sendMail(mailOptions);
-        console.log('✅ Email sent:', info.messageId);
+        console.log(`✅ Email successfully sent to ${to}:`, info.messageId);
         return { success: true, messageId: info.messageId };
     } catch (error) {
-        console.error('❌ Email send failed:', error.message);
+        console.error(`❌ SMTP Error for ${to}:`, error.message);
+        if (error.code === 'EAUTH') {
+            console.error('Check your EMAIL_USER and EMAIL_PASSWORD in .env');
+        }
         return { success: false, error: error.message };
     }
 };

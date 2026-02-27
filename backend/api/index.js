@@ -174,10 +174,17 @@ app.get('/api/user/push/vapid-public-key', (req, res) => {
 
 app.post('/api/user/push/subscribe', authenticateToken, async (req, res) => {
     try {
-        const { endpoint, keys } = req.body;
-        if (!endpoint || !keys) return res.status(400).json({ message: 'Invalid subscription' });
+        // Support both direct payload {endpoint, keys} and nested {subscription: {endpoint, keys}}
+        const subscription = req.body.subscription || req.body;
 
-        // Remove existing subscription for this endpoint (avoid duplicates)
+        const { endpoint, keys } = subscription;
+        if (!endpoint || !keys) {
+            return res.status(400).json({
+                message: 'Invalid subscription data. Expected endpoint and keys.'
+            });
+        }
+
+        // Remove existing subscription for this endpoint to avoid duplicates/stale data
         await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
 
         // Save new subscription
@@ -187,10 +194,11 @@ app.post('/api/user/push/subscribe', authenticateToken, async (req, res) => {
             keys
         });
 
+        console.log(`✅ Push subscription saved for user ${req.user.id}`);
         res.json({ message: 'Subscribed successfully' });
     } catch (err) {
         console.error('Push subscribe error:', err);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ message: 'Failed to save push subscription' });
     }
 });
 
@@ -1873,39 +1881,8 @@ app.post('/api/admin/send-push', authenticateToken, requireAdmin, async (req, re
     }
 });
 
-// ★ USER: Subscribe to Push Notifications
-app.post('/api/user/subscribe-push', authenticateToken, async (req, res) => {
-    try {
-        const { subscription } = req.body;
-        if (!subscription || !subscription.endpoint) {
-            return res.status(400).json({ message: 'Invalid subscription object' });
-        }
-
-        const userId = req.user.id;
-
-        // Check if existing endpoint already saved for this user
-        const existing = await db.select().from(pushSubscriptions)
-            .where(eq(pushSubscriptions.endpoint, subscription.endpoint))
-            .limit(1).then(r => r[0]);
-
-        if (existing) {
-            // Already subscribed on this device
-            return res.json({ message: 'Already subscribed' });
-        }
-
-        // Save new subscription
-        await db.insert(pushSubscriptions).values({
-            userId,
-            endpoint: subscription.endpoint,
-            keys: subscription.keys
-        });
-
-        res.json({ message: 'Push subscription saved successfully' });
-    } catch (err) {
-        console.error('Push subscription error:', err);
-        res.status(500).json({ message: 'Failed to subscribe to push notifications' });
-    }
-});
+// Maintenance Mode is checked via middleware
+// Audit logs are inserted for all critical actions above
 
 if (require.main === module) {
     const PORT = process.env.PORT || 3000;

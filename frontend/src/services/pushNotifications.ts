@@ -76,7 +76,7 @@ export async function registerPushNotifications(): Promise<boolean> {
 
         // 5. Send subscription to backend
         const subJSON = subscription.toJSON();
-        await api.post('/user/subscribe-push', {
+        await api.post('/user/push/subscribe', {
             subscription: {
                 endpoint: subJSON.endpoint,
                 keys: subJSON.keys
