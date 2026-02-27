@@ -1,8 +1,13 @@
 const nodemailer = require('nodemailer');
 
-// Create transporter
-const createTransporter = (testConfig = null) => {
-    const config = testConfig || {
+// Keep a singleton transporter instance to reuse connections
+let transporterInstance = null;
+
+const createTransporter = () => {
+    // If instance already exists, return it
+    if (transporterInstance) return transporterInstance;
+
+    const config = {
         host: process.env.EMAIL_HOST || 'smtp.gmail.com',
         port: parseInt(process.env.EMAIL_PORT || '587'),
         secure: process.env.EMAIL_SECURE === 'true',
@@ -11,15 +16,19 @@ const createTransporter = (testConfig = null) => {
             pass: process.env.EMAIL_PASSWORD
         },
         tls: {
-            // Do not fail on invalid certificates (common on custom mail servers)
             rejectUnauthorized: false
         },
-        // Enable detailed logging in production logs if debug is on
+        // IMPORTANT: Timeouts to prevent hanging
+        connectionTimeout: 10000, // 10s
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
         logger: process.env.EMAIL_DEBUG === 'true',
         debug: process.env.EMAIL_DEBUG === 'true'
     };
 
-    return nodemailer.createTransport(config);
+    console.log(`📡 Creating new SMTP transporter for ${config.host}:${config.port}`);
+    transporterInstance = nodemailer.createTransport(config);
+    return transporterInstance;
 };
 
 // Email Templates
@@ -245,6 +254,18 @@ const sendEmail = async (to, template, data) => {
         }
 
         const transporter = createTransporter();
+
+        // Verify connection once on first use
+        if (!transporterInstance.verified) {
+            try {
+                await transporter.verify();
+                transporterInstance.verified = true;
+                console.log('✅ SMTP Connection verified');
+            } catch (vErr) {
+                console.error('❌ SMTP Verification failed:', vErr.message);
+                // Continue anyway, it might work during send
+            }
+        }
 
         // Handle template lookup if a string name is provided
         let subject, html;

@@ -1835,35 +1835,29 @@ app.post('/api/admin/send-email', authenticateToken, requireAdmin, async (req, r
         // Remove duplicates
         const uniqueEmails = [...new Set(emailList)];
 
-        // Send emails using the bulk email template
-        let successCount = 0;
-        let failCount = 0;
+        // Send emails in the background to avoid Vercel timeout (10s limit)
+        sendBulkEmails(uniqueEmails, 'bulkEmail', { subject, body })
+            .then(results => {
+                console.log(`📧 Background email batch finished: ${results.sent} sent, ${results.failed} failed`);
+            })
+            .catch(err => {
+                console.error('❌ Background email batch error:', err);
+            });
 
-        for (const email of uniqueEmails) {
-            try {
-                await sendEmail(email, 'bulkEmail', { subject, body });
-                successCount++;
-            } catch (err) {
-                console.error(`Failed to send to ${email}:`, err.message);
-                failCount++;
-            }
-        }
-
-        // Audit log
+        // Audit log (immediate)
         await db.insert(auditLogs).values({
             adminId: req.user.id,
             targetId: null,
             targetType: 'email',
-            action: 'send_bulk_email',
-            details: `Sent email "${subject}" to ${successCount} recipients (${failCount} failed)`,
+            action: 'send_bulk_email_queued',
+            details: `Queued email "${subject}" for ${uniqueEmails.length} recipients`,
             ip: req.ip
         });
 
         res.json({
-            message: `Email sent to ${successCount} recipients`,
-            success: successCount,
-            failed: failCount,
-            total: uniqueEmails.length
+            message: `Email sending started for ${uniqueEmails.length} recipients...`,
+            queued: uniqueEmails.length,
+            success: true
         });
     } catch (err) {
         console.error('Send email error:', err);
