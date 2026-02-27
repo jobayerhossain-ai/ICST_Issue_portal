@@ -1,20 +1,50 @@
 import api from './api';
 import { toast } from 'sonner';
 
-// Check if push notifications are supported
-export function isPushSupported(): boolean {
-    return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+// Check if push notifications are supported and why if not
+export function getPushSupportStatus(): { supported: boolean; reason?: string } {
+    const hasSW = 'serviceWorker' in navigator;
+    const hasPush = 'PushManager' in window;
+    const hasNotification = 'Notification' in window;
+
+    if (hasSW && hasPush && hasNotification) {
+        return { supported: true };
+    }
+
+    // iOS Safari specific check
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS && !hasPush) {
+        return {
+            supported: false,
+            reason: 'iOS-PWA-REQUIRED'
+        };
+    }
+
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        return { supported: false, reason: 'HTTPS-REQUIRED' };
+    }
+
+    return { supported: false, reason: 'NOT-SUPPORTED' };
 }
 
 // Register Service Worker and subscribe to push notifications
 export async function registerPushNotifications(): Promise<boolean> {
-    if (!isPushSupported()) {
-        console.warn('Push notifications require HTTPS or localhost. Your browser blocked the request.');
-        // Only toast if they aren't on localhost, implying they are testing on LAN
-        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-            toast.info('Browser Security Alert', {
-                description: 'Push Notifications are blocked by your browser because you are not on HTTPS or localhost. Try testing on "localhost" instead of an IP address.'
+    const support = getPushSupportStatus();
+
+    if (!support.supported) {
+        console.warn('Push support check failed:', support.reason);
+
+        // Only toast if it's a known issue we can help the user with
+        if (support.reason === 'HTTPS-REQUIRED') {
+            toast.error('Security Restriction', {
+                description: 'Push notifications require HTTPS. Please use a secure connection.'
             });
+        } else if (support.reason === 'iOS-PWA-REQUIRED') {
+            toast.info('Setup Required', {
+                description: 'To receive notifications on iPhone, tap "Share" and select "Add to Home Screen".'
+            });
+        } else {
+            console.log('Push notifications not supported by this browser.');
         }
         return false;
     }
