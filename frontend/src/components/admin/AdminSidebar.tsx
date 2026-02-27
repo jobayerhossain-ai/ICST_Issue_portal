@@ -36,8 +36,7 @@ const menuItems = [
   { title: 'Vote Monitor', url: '/admin/vote-monitor', icon: BarChart3 },
   { title: 'User Management', url: '/admin/users', icon: Users },
   { title: 'Staff Management', url: '/admin/staff', icon: Shield },
-  { title: 'Communications', url: '/admin/communications', icon: MessageSquare },
-  { title: 'Bulk Email', url: '/admin/bulk-email', icon: Bell },
+  { title: 'Push & Email', url: '/admin/communications', icon: Bell },
   { title: 'Emergency Control', url: '/admin/emergency', icon: Lock },
   // Placeholders for future features
   { title: 'Reports & Analytics', url: '/admin/reports', icon: BarChart },
@@ -65,14 +64,14 @@ export function AdminSidebar() {
         <div className="p-4 border-b border-border">
           {open ? (
             <div className="flex items-center gap-3 mb-2">
-              <img src="/logo.png" className="h-10 w-10 neon-glow" />
+              <img src="/logo.png" className="h-10 w-10 shadow-sm rounded-lg" />
               <div>
                 <h2 className="font-bold text-primary">Admin Panel</h2>
                 <p className="text-xs text-muted-foreground">Issue Management</p>
               </div>
             </div>
           ) : (
-            <img src="/logo.png" className="h-8 w-8 neon-glow mx-auto" />
+            <img src="/logo.png" className="h-8 w-8 shadow-sm rounded-lg mx-auto" />
           )}
         </div>
 
@@ -106,7 +105,7 @@ export function AdminSidebar() {
                       to={item.url}
                       end
                       className="hover:bg-muted/50"
-                      activeClassName="bg-primary/10 text-primary font-medium neon-border"
+                      activeClassName="bg-primary/10 text-primary font-medium border-l-4 border-primary"
                     >
                       <item.icon className={open ? 'mr-3 h-5 w-5' : 'h-5 w-5'} />
                       {open && <span>{item.title}</span>}

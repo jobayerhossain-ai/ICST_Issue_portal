@@ -45,9 +45,12 @@ const AddIssue = () => {
     const loadIssue = async () => {
       try {
         const { data } = await api.get(`/issues/${editId}`);
-        setFormData(data);
-        if (data.evidence) {
-          setPreview(data.evidence);
+        setFormData({
+          ...data,
+          evidence: data.imageUrl || data.evidence || "",
+        });
+        if (data.imageUrl || data.evidence) {
+          setPreview(data.imageUrl || data.evidence);
         }
       } catch (error) {
         console.error("Failed to load issue", error);
@@ -125,16 +128,19 @@ const AddIssue = () => {
     setIsSubmitting(true);
 
     try {
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        status: formData.status,
+        imageUrl: formData.evidence || null
+      };
+
       if (isEditing && editId) {
-        await api.put(`/issues/${editId}`, { ...formData });
+        await api.patch(`/issues/${editId}`, payload);
         toast({ title: "Success!", description: "Issue updated successfully" });
       } else {
-        await api.post('/issues', {
-          ...formData,
-          votes: { good: 0, bad: 0 },
-          views: 0,
-        });
-
+        await api.post('/issues', payload);
         toast({ title: "Success!", description: "Issue added successfully" });
       }
 
@@ -168,11 +174,11 @@ const AddIssue = () => {
         animate={{ opacity: 1, y: 0 }}
         className="max-w-3xl"
       >
-        <h1 className="text-3xl font-bold mb-6 bg-gradient-to-r from-neon-cyan to-neon-purple bg-clip-text text-transparent">
+        <h1 className="text-3xl font-bold mb-6 text-slate-800">
           {isEditing ? "Edit Issue" : "Add New Issue"}
         </h1>
 
-        <form onSubmit={handleSubmit} className="glass-card p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="bg-white border rounded-xl p-6 space-y-6 shadow-sm">
           {/* Title */}
           <input
             type="text"
@@ -307,7 +313,7 @@ const AddIssue = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-4 bg-gradient-to-r from-neon-cyan to-neon-purple text-primary-foreground rounded-lg font-semibold"
+            className="w-full py-4 bg-primary text-white hover:bg-primary/90 transition-colors rounded-lg font-semibold"
           >
             {isSubmitting
               ? "Processing..."

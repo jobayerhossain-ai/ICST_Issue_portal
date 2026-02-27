@@ -5,5 +5,25 @@
             "source": "/api/(.*)",
             "destination": "/api/index.js"
         }
+    ],
+    "headers": [
+        {
+            "source": "/api/issues",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "public, max-age=60, s-maxage=300, stale-while-revalidate"
+                }
+            ]
+        },
+        {
+            "source": "/api/(.*)",
+            "headers": [
+                {
+                    "key": "Accept-Encoding",
+                    "value": "gzip, br"
+                }
+            ]
+        }
     ]
 }

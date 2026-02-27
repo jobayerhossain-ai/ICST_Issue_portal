@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Shield, User, FileText, Settings, Search, Filter } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/services/api';
-import { toast } from 'sonner';
 
 interface AuditLog {
     _id: string;
@@ -21,26 +21,20 @@ interface AuditLog {
 }
 
 const AuditLogs = () => {
-    const [logs, setLogs] = useState<AuditLog[]>([]);
-    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState('all');
 
-    useEffect(() => {
-        fetchLogs();
-    }, []);
-
-    const fetchLogs = async () => {
-        try {
+    const { data: logs = [] } = useQuery<AuditLog[]>({
+        queryKey: ['auditLogs'],
+        queryFn: async () => {
             const { data } = await api.get('/admin/audit-logs');
-            setLogs(data);
-        } catch (error) {
-            console.error(error);
-            toast.error('Audit logs লোড করা যায়নি');
-        } finally {
-            setLoading(false);
-        }
-    };
+            return data;
+        },
+        staleTime: 30000,
+        gcTime: 600000,
+        refetchInterval: 10000,
+        placeholderData: (prev) => prev ?? [],
+    });
 
     const getActionIcon = (targetType: string) => {
         switch (targetType) {
@@ -58,7 +52,7 @@ const AuditLogs = () => {
         return 'bg-blue-50 border-blue-200';
     };
 
-    const filteredLogs = logs.filter(log => {
+    const filteredLogs = logs.filter((log: AuditLog) => {
         const matchesSearch = log.details?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             log.adminId?.email?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesType = typeFilter === 'all' || log.targetType === typeFilter;
@@ -116,12 +110,7 @@ const AuditLogs = () => {
             </Card>
 
             {/* Logs List */}
-            {loading ? (
-                <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">লোড হচ্ছে...</p>
-                </div>
-            ) : filteredLogs.length === 0 ? (
+            {filteredLogs.length === 0 ? (
                 <Card>
                     <CardContent className="py-12 text-center text-gray-500">
                         কোন audit log পাওয়া যায়নি
@@ -129,7 +118,7 @@ const AuditLogs = () => {
                 </Card>
             ) : (
                 <div className="space-y-3">
-                    {filteredLogs.map((log, index) => (
+                    {filteredLogs.map((log: AuditLog, index: number) => (
                         <motion.div
                             key={log._id}
                             initial={{ opacity: 0, x: -20 }}

@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Send, Image as ImageIcon, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { toast } from 'sonner';
 
 const UserSubmitIssue = () => {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const [loading, setLoading] = useState(false);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [formData, setFormData] = useState({
@@ -64,6 +66,10 @@ const UserSubmitIssue = () => {
                 imageUrl
             });
 
+            queryClient.invalidateQueries({ queryKey: ['user-issues'] });
+            queryClient.invalidateQueries({ queryKey: ['user-stats'] });
+            queryClient.invalidateQueries({ queryKey: ['user-activities'] });
+
             toast.success('ইস্যু সফলভাবে সাবমিট হয়েছে! (Issue submitted successfully!)');
             navigate('/user/my-issues');
         } catch (err: unknown) {
@@ -75,25 +81,25 @@ const UserSubmitIssue = () => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto py-10">
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-8"
+                className="mb-8 text-center"
             >
-                <h1 className="text-4xl font-bold text-gray-800 mb-2">নতুন ইস্যু সাবমিট করুন</h1>
-                <p className="text-gray-600">Submit New Issue</p>
+                <h1 className="text-4xl font-bold text-slate-800 mb-2">নতুন ইস্যু সাবমিট করুন</h1>
+                <p className="text-slate-600">আপনার সমস্যা বিস্তারিতভাবে জানান</p>
             </motion.div>
 
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-xl shadow-lg p-8 border border-gray-100"
+                className="bg-white rounded-xl p-8 border border-slate-200 shadow-sm"
             >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Title */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
                             শিরোনাম <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -103,13 +109,13 @@ const UserSubmitIssue = () => {
                             onChange={handleChange}
                             required
                             placeholder="ইস্যুর শিরোনাম লিখুন"
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary/50 text-slate-800 placeholder:text-slate-400 hover:bg-slate-50 transition-all"
                         />
                     </div>
 
                     {/* Description */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
                             বর্ণনা <span className="text-red-500">*</span>
                         </label>
                         <textarea
@@ -119,7 +125,7 @@ const UserSubmitIssue = () => {
                             required
                             rows={6}
                             placeholder="ইস্যুর বিস্তারিত বর্ণনা দিন..."
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all resize-none"
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary/50 text-slate-800 placeholder:text-slate-400 hover:bg-slate-50 transition-all resize-none"
                         />
                     </div>
 
@@ -127,14 +133,14 @@ const UserSubmitIssue = () => {
                     <div className="grid md:grid-cols-2 gap-6">
                         {/* Category */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
                                 ক্যাটাগরি <span className="text-red-500">*</span>
                             </label>
                             <select
                                 name="category"
                                 value={formData.category}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary/50 text-slate-800 hover:bg-slate-50 transition-all"
                             >
                                 <option value="academic">একাডেমিক (Academic)</option>
                                 <option value="infrastructure">অবকাঠামো (Infrastructure)</option>
@@ -146,14 +152,14 @@ const UserSubmitIssue = () => {
 
                         {/* Priority */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
                                 প্রাধান্য <span className="text-red-500">*</span>
                             </label>
                             <select
                                 name="priority"
                                 value={formData.priority}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary/50 text-slate-800 hover:bg-slate-50 transition-all"
                             >
                                 <option value="low">নিম্ন (Low)</option>
                                 <option value="medium">মধ্যম (Medium)</option>
@@ -164,16 +170,16 @@ const UserSubmitIssue = () => {
 
                     {/* Image Upload */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
                             ছবি আপলোড করুন (ঐচ্ছিক)
                         </label>
 
                         {!imagePreview ? (
-                            <label className="block cursor-pointer">
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-sky-500 hover:bg-sky-50 transition-all">
-                                    <ImageIcon className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                                    <p className="text-gray-600">ক্লিক করে ছবি নির্বাচন করুন</p>
-                                    <p className="text-sm text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+                            <label className="block cursor-pointer group">
+                                <div className="border-2 border-dashed border-slate-200 rounded-lg p-8 text-center hover:border-primary/50 hover:bg-slate-50 transition-all bg-white">
+                                    <ImageIcon className="w-12 h-12 mx-auto text-slate-400 group-hover:text-primary mb-2 transition-colors" />
+                                    <p className="text-slate-600 group-hover:text-primary transition-colors font-medium">ক্লিক করে ছবি নির্বাচন করুন</p>
+                                    <p className="text-sm text-slate-400 mt-1">PNG, JPG up to 5MB</p>
                                 </div>
                                 <input
                                     type="file"
@@ -183,19 +189,21 @@ const UserSubmitIssue = () => {
                                 />
                             </label>
                         ) : (
-                            <div className="relative">
+                            <div className="relative group">
                                 <img
                                     src={imagePreview}
                                     alt="Preview"
-                                    className="w-full h-64 object-cover rounded-lg"
+                                    className="w-full h-64 object-cover rounded-lg border border-slate-200 shadow-sm"
                                 />
-                                <button
-                                    type="button"
-                                    onClick={removeImage}
-                                    className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                                    <button
+                                        type="button"
+                                        onClick={removeImage}
+                                        className="bg-red-500 hover:bg-red-600 text-white p-3 rounded-full transition-colors transform hover:scale-110"
+                                    >
+                                        <X className="w-6 h-6" />
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -204,7 +212,7 @@ const UserSubmitIssue = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-gradient-to-r from-sky-500 to-blue-600 text-white py-4 rounded-lg font-semibold hover:from-sky-600 hover:to-blue-700 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center space-x-2"
+                        className="w-full bg-primary text-white py-4 rounded-lg font-semibold hover:bg-primary/90 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
                     >
                         <Send className="w-5 h-5" />
                         <span>{loading ? 'সাবমিট হচ্ছে...' : 'ইস্যু সাবমিট করুন'}</span>

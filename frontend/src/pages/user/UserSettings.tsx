@@ -18,11 +18,23 @@ const UserSettings = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
-    // Notification settings state
-    const [emailNotifications, setEmailNotifications] = useState(true);
-    const [pushNotifications, setPushNotifications] = useState(true);
-    const [issueUpdates, setIssueUpdates] = useState(true);
-    const [commentNotifications, setCommentNotifications] = useState(true);
+    // Notification settings state — loaded from localStorage
+    const [emailNotifications, setEmailNotifications] = useState(() => {
+        const saved = localStorage.getItem('notif_email');
+        return saved !== null ? JSON.parse(saved) : true;
+    });
+    const [pushNotifications, setPushNotifications] = useState(() => {
+        const saved = localStorage.getItem('notif_push');
+        return saved !== null ? JSON.parse(saved) : true;
+    });
+    const [issueUpdates, setIssueUpdates] = useState(() => {
+        const saved = localStorage.getItem('notif_issue');
+        return saved !== null ? JSON.parse(saved) : true;
+    });
+    const [commentNotifications, setCommentNotifications] = useState(() => {
+        const saved = localStorage.getItem('notif_comment');
+        return saved !== null ? JSON.parse(saved) : true;
+    });
 
     const tabs = [
         { id: 'profile', label: 'প্রোফাইল', icon: User },
@@ -49,8 +61,11 @@ const UserSettings = () => {
     };
 
     const handleNotificationSave = () => {
-        // TODO: API call to save notification preferences
-        toast.success('নোটিফিকেশন সেটিংস সংরক্ষিত হয়েছে');
+        localStorage.setItem('notif_email', JSON.stringify(emailNotifications));
+        localStorage.setItem('notif_push', JSON.stringify(pushNotifications));
+        localStorage.setItem('notif_issue', JSON.stringify(issueUpdates));
+        localStorage.setItem('notif_comment', JSON.stringify(commentNotifications));
+        toast.success('নোটিফিকেশন সেটিংস সংরক্ষিত হয়েছে ✅');
     };
 
     return (
@@ -76,8 +91,8 @@ const UserSettings = () => {
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
                                         className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === tab.id
-                                                ? 'bg-sky-500 text-white'
-                                                : 'hover:bg-gray-100 text-gray-700'
+                                            ? 'bg-primary text-white'
+                                            : 'hover:bg-gray-100 text-gray-700'
                                             }`}
                                     >
                                         <Icon className="w-5 h-5" />
@@ -110,7 +125,7 @@ const UserSettings = () => {
                                                 type="text"
                                                 value={name}
                                                 onChange={(e) => setName(e.target.value)}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                                             />
                                         </div>
 
@@ -134,7 +149,7 @@ const UserSettings = () => {
                                             <select
                                                 value={department}
                                                 onChange={(e) => setDepartment(e.target.value)}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                                             >
                                                 <option value="CSE">CSE</option>
                                                 <option value="EEE">EEE</option>
@@ -159,7 +174,7 @@ const UserSettings = () => {
 
                                         <button
                                             onClick={handleProfileSave}
-                                            className="w-full bg-sky-500 text-white py-3 rounded-lg font-semibold hover:bg-sky-600 transition-colors flex items-center justify-center space-x-2"
+                                            className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center space-x-2"
                                         >
                                             <Save className="w-5 h-5" />
                                             <span>পরিবর্তন সংরক্ষণ করুন</span>
@@ -187,7 +202,7 @@ const UserSettings = () => {
                                                 type="password"
                                                 value={currentPassword}
                                                 onChange={(e) => setCurrentPassword(e.target.value)}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                                             />
                                         </div>
 
@@ -199,7 +214,7 @@ const UserSettings = () => {
                                                 type="password"
                                                 value={newPassword}
                                                 onChange={(e) => setNewPassword(e.target.value)}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                                             />
                                         </div>
 
@@ -211,13 +226,13 @@ const UserSettings = () => {
                                                 type="password"
                                                 value={confirmPassword}
                                                 onChange={(e) => setConfirmPassword(e.target.value)}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                                             />
                                         </div>
 
                                         <button
                                             onClick={handlePasswordChange}
-                                            className="w-full bg-sky-500 text-white py-3 rounded-lg font-semibold hover:bg-sky-600 transition-colors flex items-center justify-center space-x-2"
+                                            className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center space-x-2"
                                         >
                                             <Lock className="w-5 h-5" />
                                             <span>পাসওয়ার্ড পরিবর্তন করুন</span>
@@ -235,75 +250,108 @@ const UserSettings = () => {
                                 className="space-y-6"
                             >
                                 <div>
-                                    <h2 className="text-xl font-bold text-gray-800 mb-4">নোটিফিকেশন পছন্দ</h2>
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                            <div>
-                                                <p className="font-medium text-gray-800">ইমেইল নোটিফিকেশন</p>
-                                                <p className="text-sm text-gray-600">ইমেইলে আপডেট পান</p>
+                                    <h2 className="text-xl font-bold text-gray-800 mb-2">নোটিফিকেশন পছন্দ</h2>
+                                    <p className="text-sm text-gray-500 mb-6">আপনি কোন ধরনের নোটিফিকেশন পেতে চান তা নির্বাচন করুন</p>
+                                    <div className="space-y-3">
+                                        {/* Email Notifications */}
+                                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                            <div className="flex-1 mr-4">
+                                                <p className="font-semibold text-gray-800">ইমেইল নোটিফিকেশন</p>
+                                                <p className="text-sm text-gray-500">ইমেইলে আপডেট পান</p>
                                             </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={emailNotifications}
-                                                    onChange={(e) => setEmailNotifications(e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
-                                            </label>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xs font-bold ${emailNotifications ? 'text-green-600' : 'text-gray-400'}`}>
+                                                    {emailNotifications ? 'চালু' : 'বন্ধ'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={emailNotifications}
+                                                    onClick={() => setEmailNotifications(!emailNotifications)}
+                                                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${emailNotifications ? 'bg-green-500 focus:ring-green-500' : 'bg-gray-300 focus:ring-gray-400'}`}
+                                                >
+                                                    <span
+                                                        className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200 ease-in-out ${emailNotifications ? 'translate-x-7' : 'translate-x-1'}`}
+                                                    />
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                            <div>
-                                                <p className="font-medium text-gray-800">পুশ নোটিফিকেশন</p>
-                                                <p className="text-sm text-gray-600">ব্রাউজার নোটিফিকেশন পান</p>
+                                        {/* Push Notifications */}
+                                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                            <div className="flex-1 mr-4">
+                                                <p className="font-semibold text-gray-800">পুশ নোটিফিকেশন</p>
+                                                <p className="text-sm text-gray-500">ব্রাউজার নোটিফিকেশন পান</p>
                                             </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={pushNotifications}
-                                                    onChange={(e) => setPushNotifications(e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
-                                            </label>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xs font-bold ${pushNotifications ? 'text-green-600' : 'text-gray-400'}`}>
+                                                    {pushNotifications ? 'চালু' : 'বন্ধ'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={pushNotifications}
+                                                    onClick={() => setPushNotifications(!pushNotifications)}
+                                                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${pushNotifications ? 'bg-green-500 focus:ring-green-500' : 'bg-gray-300 focus:ring-gray-400'}`}
+                                                >
+                                                    <span
+                                                        className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200 ease-in-out ${pushNotifications ? 'translate-x-7' : 'translate-x-1'}`}
+                                                    />
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                            <div>
-                                                <p className="font-medium text-gray-800">ইস্যু আপডেট</p>
-                                                <p className="text-sm text-gray-600">ইস্যু স্ট্যাটাস পরিবর্তনের সময়</p>
+                                        {/* Issue Updates */}
+                                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                            <div className="flex-1 mr-4">
+                                                <p className="font-semibold text-gray-800">ইস্যু আপডেট</p>
+                                                <p className="text-sm text-gray-500">ইস্যু স্ট্যাটাস পরিবর্তনের সময়</p>
                                             </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={issueUpdates}
-                                                    onChange={(e) => setIssueUpdates(e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
-                                            </label>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xs font-bold ${issueUpdates ? 'text-green-600' : 'text-gray-400'}`}>
+                                                    {issueUpdates ? 'চালু' : 'বন্ধ'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={issueUpdates}
+                                                    onClick={() => setIssueUpdates(!issueUpdates)}
+                                                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${issueUpdates ? 'bg-green-500 focus:ring-green-500' : 'bg-gray-300 focus:ring-gray-400'}`}
+                                                >
+                                                    <span
+                                                        className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200 ease-in-out ${issueUpdates ? 'translate-x-7' : 'translate-x-1'}`}
+                                                    />
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                            <div>
-                                                <p className="font-medium text-gray-800">কমেন্ট নোটিফিকেশন</p>
-                                                <p className="text-sm text-gray-600">নতুন কমেন্ট পেলে</p>
+                                        {/* Comment Notifications */}
+                                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                            <div className="flex-1 mr-4">
+                                                <p className="font-semibold text-gray-800">কমেন্ট নোটিফিকেশন</p>
+                                                <p className="text-sm text-gray-500">নতুন কমেন্ট পেলে</p>
                                             </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={commentNotifications}
-                                                    onChange={(e) => setCommentNotifications(e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
-                                            </label>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xs font-bold ${commentNotifications ? 'text-green-600' : 'text-gray-400'}`}>
+                                                    {commentNotifications ? 'চালু' : 'বন্ধ'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={commentNotifications}
+                                                    onClick={() => setCommentNotifications(!commentNotifications)}
+                                                    className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${commentNotifications ? 'bg-green-500 focus:ring-green-500' : 'bg-gray-300 focus:ring-gray-400'}`}
+                                                >
+                                                    <span
+                                                        className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200 ease-in-out ${commentNotifications ? 'translate-x-7' : 'translate-x-1'}`}
+                                                    />
+                                                </button>
+                                            </div>
                                         </div>
 
                                         <button
                                             onClick={handleNotificationSave}
-                                            className="w-full bg-sky-500 text-white py-3 rounded-lg font-semibold hover:bg-sky-600 transition-colors flex items-center justify-center space-x-2"
+                                            className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center space-x-2 mt-4"
                                         >
                                             <Save className="w-5 h-5" />
                                             <span>সেটিংস সংরক্ষণ করুন</span>

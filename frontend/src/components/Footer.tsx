@@ -11,7 +11,7 @@ const Footer = () => {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <img src="/logo.png" alt="ICST" className="h-12 w-12 neon-glow" />
+              <img src="/logo.png" alt="ICST" className="h-12 w-12 drop-shadow-md" />
               <div>
                 <h3 className="text-lg font-bold text-primary">ICST Issue Portal</h3>
                 <p className="text-xs text-muted-foreground">Community Voice</p>
@@ -56,23 +56,23 @@ const Footer = () => {
           <div>
             <h4 className="text-lg font-semibold text-foreground mb-4">Follow Us</h4>
             <div className="flex gap-3">
-              <a 
-                href="https://www.facebook.com/icst69016/" 
-                className="p-3 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary transition-all neon-border"
+              <a
+                href="https://www.facebook.com/icst69016/"
+                className="p-3 rounded-lg bg-slate-50 border border-slate-200 hover:bg-purple-50 hover:border-purple-200 hover:text-primary transition-all shadow-sm"
                 aria-label="Facebook"
               >
                 <Facebook size={20} />
               </a>
-              <a 
-                href="#" 
-                className="p-3 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary transition-all neon-border"
+              <a
+                href="#"
+                className="p-3 rounded-lg bg-slate-50 border border-slate-200 hover:bg-purple-50 hover:border-purple-200 hover:text-primary transition-all shadow-sm"
                 aria-label="Twitter"
               >
                 <Twitter size={20} />
               </a>
-              <a 
-                href="#" 
-                className="p-3 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary transition-all neon-border"
+              <a
+                href="#"
+                className="p-3 rounded-lg bg-slate-50 border border-slate-200 hover:bg-purple-50 hover:border-purple-200 hover:text-primary transition-all shadow-sm"
                 aria-label="Instagram"
               >
                 <Instagram size={20} />
@@ -84,11 +84,11 @@ const Footer = () => {
         {/* Bottom Bar */}
         <div className="border-t border-border mt-8 pt-6 text-center">
           <p className="text-sm text-muted-foreground">
-            © {currentYear} ICST Issue Portal. All rights reserved. | Developed By 
-            <a 
-              href="https://web.facebook.com/md.rifat.389562" 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            © {currentYear} ICST Issue Portal. All rights reserved. | Developed By
+            <a
+              href="https://web.facebook.com/md.rifat.389562"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-primary hover:underline ml-1"
             >
               Jobayer Hossain

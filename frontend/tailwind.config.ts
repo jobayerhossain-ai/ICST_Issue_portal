@@ -14,6 +14,9 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["Hind Siliguri", "SF Pro Display", "Inter", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -47,25 +50,6 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
-        },
-        neon: {
-          cyan: "hsl(var(--primary))",
-          purple: "hsl(var(--secondary))",
-          blue: "hsl(var(--accent))",
-          pink: "hsl(var(--secondary))",
-          green: "hsl(var(--accent))",
-        },
-        sky: {
-          50: "hsl(var(--sky-blue-50))",
-          100: "hsl(var(--sky-blue-100))",
-          200: "hsl(var(--sky-blue-200))",
-          300: "hsl(var(--sky-blue-300))",
-          400: "hsl(var(--sky-blue-400))",
-          500: "hsl(var(--sky-blue-500))",
-          600: "hsl(var(--sky-blue-600))",
-          700: "hsl(var(--sky-blue-700))",
-          800: "hsl(var(--sky-blue-800))",
-          900: "hsl(var(--sky-blue-900))",
         },
       },
       borderRadius: {

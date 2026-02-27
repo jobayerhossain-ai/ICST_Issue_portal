@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/services/api";
 import { motion } from "framer-motion";
 import { TrendingUp, ThumbsUp, ThumbsDown, Activity } from "lucide-react";
@@ -7,37 +7,32 @@ interface VoteIssue {
   _id: string;
   id: string;
   title: string;
-  votes: {
-    good: number;
-    bad: number;
-  };
+  votesGood: number;
+  votesBad: number;
+  [key: string]: unknown;
 }
 
 const VoteMonitor = () => {
-  const [issues, setIssues] = useState<VoteIssue[]>([]);
+  const { data: issues = [] } = useQuery<VoteIssue[]>({
+    queryKey: ['voteMonitor'],
+    queryFn: async () => {
+      const { data } = await api.get('/issues');
+      return data.map((item: VoteIssue) => ({ ...item, id: item._id }));
+    },
+    staleTime: 30000,
+    gcTime: 600000,
+    refetchInterval: 10000,
+    placeholderData: (prev) => prev ?? [],
+  });
 
-  useEffect(() => {
-    const fetchIssues = async () => {
-      try {
-        const { data } = await api.get('/issues');
-        const mappedData = data.map((item: VoteIssue) => ({ ...item, id: item._id }));
-        setIssues(mappedData);
-      } catch (error) {
-        console.error("Failed to fetch issues", error);
-      }
-    };
-
-    fetchIssues();
-  }, []);
-
-  const totalGood = issues.reduce((a, b) => a + b.votes.good, 0);
-  const totalBad = issues.reduce((a, b) => a + b.votes.bad, 0);
+  const totalGood = issues.reduce((a, b) => a + (b.votesGood || 0), 0);
+  const totalBad = issues.reduce((a, b) => a + (b.votesBad || 0), 0);
   const totalVotes = totalGood + totalBad;
 
   const sortedIssues = [...issues]
     .map((i) => ({
       ...i,
-      score: i.votes.good - i.votes.bad,
+      score: (i.votesGood || 0) - (i.votesBad || 0),
     }))
     .sort((a, b) => b.score - a.score);
 
@@ -55,13 +50,13 @@ const VoteMonitor = () => {
         </div>
 
         <div className="glass-card p-6">
-          <ThumbsUp size={32} className="text-neon-green" />
+          <ThumbsUp size={32} className="text-green-500" />
           <h2 className="text-3xl font-bold">{totalGood}</h2>
           <p>Good Votes</p>
         </div>
 
         <div className="glass-card p-6">
-          <ThumbsDown size={32} className="text-destructive" />
+          <ThumbsDown size={32} className="text-red-500" />
           <h2 className="text-3xl font-bold">{totalBad}</h2>
           <p>Bad Votes</p>
         </div>
@@ -73,10 +68,13 @@ const VoteMonitor = () => {
           <div key={i.id} className="p-3 border-b border-border">
             <h3 className="font-semibold">{index + 1}. {i.title}</h3>
             <p className="text-sm text-muted-foreground">
-              Good: {i.votes.good} | Bad: {i.votes.bad} | Score: {i.score}
+              Good: {i.votesGood || 0} | Bad: {i.votesBad || 0} | Score: {i.score}
             </p>
           </div>
         ))}
+        {sortedIssues.length === 0 && (
+          <p className="text-sm text-muted-foreground">No voted issues available.</p>
+        )}
       </div>
 
     </div>

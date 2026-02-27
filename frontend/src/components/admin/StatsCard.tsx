@@ -1,3 +1,4 @@
+import React from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
@@ -12,7 +13,7 @@ interface StatsCardProps {
     delay?: number;
 }
 
-const StatsCard = ({ title, value, subtitle, trend, trendValue, icon: Icon, color, delay = 0 }: StatsCardProps) => {
+const StatsCard = React.memo(({ title, value, subtitle, trend, trendValue, icon: Icon, color, delay = 0 }: StatsCardProps) => {
     const getTrendIcon = () => {
         if (trend === 'up') return <TrendingUp className="w-4 h-4" />;
         if (trend === 'down') return <TrendingDown className="w-4 h-4" />;
@@ -22,7 +23,7 @@ const StatsCard = ({ title, value, subtitle, trend, trendValue, icon: Icon, colo
     const getTrendColor = () => {
         if (trend === 'up') return 'text-green-600 bg-green-50';
         if (trend === 'down') return 'text-red-600 bg-red-50';
-        return 'text-gray-600 bg-gray-50';
+        return 'text-slate-500 bg-slate-100';
     };
 
     return (
@@ -30,14 +31,14 @@ const StatsCard = ({ title, value, subtitle, trend, trendValue, icon: Icon, colo
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay }}
-            className="bg-white rounded-xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all"
+            className="bg-white rounded-xl p-6 border border-slate-200 hover:shadow-md hover:border-primary/20 transition-all duration-300 group"
         >
             <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-lg bg-gradient-to-br ${color}`}>
+                <div className={`p-3 rounded-lg bg-gradient-to-br ${color} shadow-lg`}>
                     <Icon className="w-6 h-6 text-white" />
                 </div>
                 {trend && trendValue && (
-                    <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${getTrendColor()}`}>
+                    <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border border-transparent ${getTrendColor()}`}>
                         {getTrendIcon()}
                         <span>{trendValue}</span>
                     </div>
@@ -45,12 +46,12 @@ const StatsCard = ({ title, value, subtitle, trend, trendValue, icon: Icon, colo
             </div>
 
             <div>
-                <p className="text-3xl font-bold text-gray-800 mb-1">{value}</p>
-                <p className="text-sm font-semibold text-gray-700">{title}</p>
-                {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+                <p className="text-3xl font-bold text-slate-800 mb-1 group-hover:scale-105 transition-transform origin-left">{value}</p>
+                <p className="text-sm font-semibold text-slate-600">{title}</p>
+                {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
             </div>
         </motion.div>
     );
-};
+});
 
 export default StatsCard;

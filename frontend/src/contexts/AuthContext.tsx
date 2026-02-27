@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import api from '@/services/api';
+import { registerPushNotifications, unregisterPushNotifications } from '@/services/pushNotifications';
 
 interface User {
   _id: string;
@@ -50,6 +51,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           setUser(data);
           setIsAdmin(data.role === 'admin');
           setIsUser(data.role === 'user');
+          // Auto-subscribe push notifications (non-blocking)
+          registerPushNotifications().catch(() => { });
         } catch (error) {
           console.error('Auth check failed', error);
           localStorage.removeItem('token');
@@ -70,6 +73,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser(data);
     setIsAdmin(data.role === 'admin');
     setIsUser(data.role === 'user');
+    // Auto-subscribe push notifications (non-blocking)
+    registerPushNotifications().catch(() => { });
   };
 
   const register = async (roll: string, name: string, department: string, email: string, password: string) => {
@@ -85,6 +90,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser(null);
     setIsAdmin(false);
     setIsUser(false);
+    // Unsubscribe push notifications
+    unregisterPushNotifications().catch(() => { });
   };
 
   return (

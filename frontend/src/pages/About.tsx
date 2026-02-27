@@ -34,7 +34,7 @@ const About = () => {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-16"
         >
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-neon-cyan to-neon-purple bg-clip-text text-transparent">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent leading-snug py-1">
             আইসিএসটি ইস্যু পোর্টাল কেন তৈরি হলো?
           </h1>
           <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
@@ -77,7 +77,7 @@ const About = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 + index * 0.1 }}
-              className="glass-card p-6 hover:neon-border transition-all"
+              className="glass-card p-6 border-slate-200 border shadow-sm hover:shadow-md hover:border-primary/50 transition-all"
             >
               <feature.icon className="text-primary mb-4" size={40} />
               <h3 className="text-xl font-bold text-foreground mb-3">{feature.title}</h3>
@@ -119,7 +119,7 @@ const About = () => {
               <p className="text-sm text-muted-foreground">সমাধান প্রক্রিয়া রিয়েল-টাইমে ট্র্যাক করুন</p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-neon-green/20 border-2 border-neon-green flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-neon-green">
+              <div className="w-16 h-16 rounded-full bg-green-100 border-2 border-green-500 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-green-600">
                 4
               </div>
               <h4 className="font-semibold text-foreground mb-2">সমাধান</h4>

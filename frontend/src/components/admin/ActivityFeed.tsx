@@ -39,7 +39,7 @@ const ActivityFeed = ({ activities }: ActivityFeedProps) => {
     return (
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center space-x-2">
-                <Clock className="w-5 h-5 text-sky-600" />
+                <Clock className="w-5 h-5 text-primary" />
                 <span>সাম্প্রতিক কার্যকলাপ</span>
             </h3>
 

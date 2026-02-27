@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/services/api";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -18,29 +18,27 @@ interface Issue {
 export default function PendingIssues() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [pending, setPending] = useState<Issue[]>([]);
+  const queryClient = useQueryClient();
 
-  const fetchPending = async () => {
-    try {
-      const { data } = await api.get<Array<Issue & { _id: string }>>('/issues');
-      const mappedData = data
+  const { data: pending = [] } = useQuery<Issue[]>({
+    queryKey: ['pendingIssues'],
+    queryFn: async () => {
+      const { data } = await api.get<Array<Issue & { _id: string }>>('/admin/issues');
+      return data
         .filter((i) => i.status === "pending")
         .map((item) => ({ ...item, id: item._id }));
-      setPending(mappedData);
-    } catch (error) {
-      console.error("Failed to fetch issues", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchPending();
-  }, []);
+    },
+    staleTime: 30000,
+    gcTime: 600000,
+    refetchInterval: 10000,
+    placeholderData: (prev) => prev ?? [],
+  });
 
   const handleAccept = async (id: string) => {
     try {
-      await api.put(`/issues/${id}/status`, { status: "verified" });
-      toast({ title: "Approved", description: "Issue moved to verified." });
-      fetchPending();
+      await api.put(`/issues/${id}/status`, { status: "in-progress" });
+      toast({ title: "Approved", description: "Issue moved to in-progress." });
+      queryClient.invalidateQueries({ queryKey: ['pendingIssues'] });
     } catch (error) {
       toast({ title: "Error", variant: "destructive" });
     }
@@ -48,9 +46,9 @@ export default function PendingIssues() {
 
   const handleReject = async (id: string) => {
     try {
-      await api.put(`/issues/${id}/status`, { status: "rejected" });
-      toast({ title: "Rejected", variant: "destructive" });
-      fetchPending();
+      await api.put(`/issues/${id}/status`, { status: "resolved" });
+      toast({ title: "Rejected", variant: "destructive", description: "Issue marked as resolved (rejected)." });
+      queryClient.invalidateQueries({ queryKey: ['pendingIssues'] });
     } catch (error) {
       toast({ title: "Error", variant: "destructive" });
     }
@@ -58,7 +56,7 @@ export default function PendingIssues() {
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold mb-4 bg-gradient-to-r from-neon-cyan to-neon-purple bg-clip-text text-transparent">
+      <h1 className="text-3xl font-bold mb-4 text-slate-800">
         Pending Issues
       </h1>
 
@@ -88,7 +86,9 @@ export default function PendingIssues() {
         ))}
 
         {pending.length === 0 && (
-          <p className="opacity-60">No pending issues available.</p>
+          <div className="bg-white p-12 text-center border border-slate-200 rounded-xl shadow-sm">
+            <p className="text-slate-500 text-lg">No pending issues available.</p>
+          </div>
         )}
       </div>
     </div>

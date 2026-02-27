@@ -1,22 +1,29 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Home, FileText, PlusCircle, User as UserIcon, LogOut, Menu, Settings } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { Home, FileText, PlusCircle, User as UserIcon, LogOut, X, Settings } from 'lucide-react';
 
 interface UserSidebarProps {
     isOpen: boolean;
-    setIsOpen: (open: boolean) => void;
+    onClose: () => void;
 }
 
-const UserSidebar = ({ isOpen, setIsOpen }: UserSidebarProps) => {
+const UserSidebar = ({ isOpen, onClose }: UserSidebarProps) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
-    const currentPath = window.location.pathname;
+    const location = useLocation();
 
     const handleLogout = () => {
+        onClose();
         logout();
         navigate('/');
+    };
+
+    const handleNavigate = (path: string) => {
+        onClose();
+        // Small delay so the close animation starts before navigation
+        requestAnimationFrame(() => {
+            navigate(path);
+        });
     };
 
     const menuItems = [
@@ -28,86 +35,72 @@ const UserSidebar = ({ isOpen, setIsOpen }: UserSidebarProps) => {
     ];
 
     return (
-        <>
-            {/* Mobile Overlay */}
-            {isOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-                    onClick={() => setIsOpen(false)}
-                />
-            )}
+        <aside className="w-64 bg-white border-r border-slate-200 text-slate-800 shadow-xl h-full flex flex-col">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                    <h2 className="text-2xl font-bold text-primary leading-snug">ইউজার প্যানেল</h2>
+                    <p className="text-slate-600 text-sm">User Panel</p>
+                </div>
+                {/* Close button — only visible on mobile */}
+                <button
+                    onClick={onClose}
+                    className="lg:hidden p-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors active:scale-90"
+                    aria-label="Close sidebar"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
 
-            {/* Sidebar */}
-            <motion.aside
-                initial={false}
-                animate={{ x: isOpen ? 0 : '-100%' }}
-                className="fixed lg:static inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-sky-600 to-blue-700 text-white shadow-2xl lg:translate-x-0 transition-transform"
-            >
-                <div className="flex flex-col h-full">
-                    {/* Header */}
-                    <div className="p-6 border-b border-sky-500/30">
-                        <button
-                            onClick={() => setIsOpen(false)}
-                            className="lg:hidden absolute top-4 right-4 text-white hover:bg-white/10 p-2 rounded-lg"
-                        >
-                            <Menu className="w-5 h-5" />
-                        </button>
-                        <h2 className="text-2xl font-bold">ইউজার প্যানেল</h2>
-                        <p className="text-sky-100 text-sm">User Panel</p>
+            {/* User Info */}
+            <div className="p-6 border-b border-slate-200 bg-slate-50/50">
+                <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-purple-100 text-primary rounded-full flex items-center justify-center shadow-sm">
+                        <UserIcon className="w-6 h-6" />
                     </div>
-
-                    {/* User Info */}
-                    <div className="p-6 border-b border-sky-500/30">
-                        <div className="flex items-center space-x-3">
-                            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                                <UserIcon className="w-6 h-6" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="font-semibold truncate">{user?.name}</p>
-                                <p className="text-xs text-sky-100 truncate">{user?.roll}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Navigation */}
-                    <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                        {menuItems.map((item) => {
-                            const Icon = item.icon;
-                            const isActive = currentPath === item.path;
-
-                            return (
-                                <Link
-                                    key={item.path}
-                                    to={item.path}
-                                    onClick={() => setIsOpen(false)}
-                                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${isActive
-                                        ? 'bg-white text-sky-600 shadow-lg'
-                                        : 'text-sky-50 hover:bg-white/10'
-                                        }`}
-                                >
-                                    <Icon className="w-5 h-5" />
-                                    <div>
-                                        <p className="font-medium">{item.label}</p>
-                                        <p className="text-xs opacity-75">{item.engLabel}</p>
-                                    </div>
-                                </Link>
-                            );
-                        })}
-                    </nav>
-
-                    {/* Logout Button */}
-                    <div className="p-4 border-t border-sky-500/30">
-                        <button
-                            onClick={handleLogout}
-                            className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-white transition-all"
-                        >
-                            <LogOut className="w-5 h-5" />
-                            <span>লগআউট (Logout)</span>
-                        </button>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-800 truncate">{user?.name}</p>
+                        <p className="text-xs text-slate-600 truncate">{user?.roll}</p>
                     </div>
                 </div>
-            </motion.aside>
-        </>
+            </div>
+
+            {/* Navigation */}
+            <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                {menuItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = location.pathname === item.path;
+
+                    return (
+                        <button
+                            key={item.path}
+                            onClick={() => handleNavigate(item.path)}
+                            className={`w-full text-left flex items-center space-x-3 px-4 py-3 rounded-lg transition-all active:scale-[0.97] ${isActive
+                                ? 'bg-purple-50 text-primary font-semibold shadow-sm border border-purple-100'
+                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
+                                }`}
+                        >
+                            <Icon className="w-5 h-5" />
+                            <div>
+                                <p className="font-medium">{item.label}</p>
+                                <p className="text-xs opacity-75">{item.engLabel}</p>
+                            </div>
+                        </button>
+                    );
+                })}
+            </nav>
+
+            {/* Logout Button */}
+            <div className="p-4 border-t border-slate-200 bg-slate-50/50">
+                <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 font-medium transition-all border border-red-100 active:scale-[0.97]"
+                >
+                    <LogOut className="w-5 h-5" />
+                    <span>লগআউট (Logout)</span>
+                </button>
+            </div>
+        </aside>
     );
 };
 

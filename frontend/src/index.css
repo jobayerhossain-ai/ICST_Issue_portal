@@ -3,59 +3,83 @@
 @tailwind utilities;
 
 /* ======================================================
-   ICST Issue Portal 2025 — Premium Sky Blue Theme
-   APPLE-STYLE ANIMATIONS • SMOOTH • LAG-FREE
+   ICST Issue Portal — Clean Premium White & Purple Theme
+   HIGH PERFORMANCE • GPU ACCELERATED • 60FPS
 ======================================================*/
 
 @layer base {
   :root {
-    /* Premium Sky Blue Color System - Enhanced Contrast */
-    --background: 210 40% 92%;
-    --foreground: 220 40% 15%;
+    /* Premium White & Soft Purple Theme */
+    --background: 0 0% 100%;
+    /* Pure White */
+    --foreground: 222 47% 11%;
+    /* Dark Slate Text */
 
+    /* Glass Cards - Light Translucency */
     --card: 0 0% 100%;
-    --card-foreground: 220 40% 15%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 40% 15%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 206 100% 50%;
+    /* Vivid Accents - Soft Premium Purple */
+    --primary: 262 83% 65%;
+    /* Soft Premium Purple */
     --primary-foreground: 0 0% 100%;
+    /* White text inside purple buttons */
 
-    --secondary: 204 100% 75%;
-    --secondary-foreground: 220 40% 15%;
+    --secondary: 210 40% 96.1%;
+    /* Very light gray/slate */
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 210 30% 85%;
-    --muted-foreground: 220 20% 40%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Grayish Text */
 
-    --accent: 199 89% 48%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 262 83% 95%;
+    /* Very soft purple background */
+    --accent-foreground: 262 83% 45%;
+    /* Darker purple text */
 
-    --destructive: 0 85% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 210 30% 75%;
-    --input: 210 25% 88%;
-    --ring: 206 100% 50%;
+    --border: 214.3 31.8% 91.4%;
+    /* Light gray borders */
+    --input: 214.3 31.8% 91.4%;
+    --ring: 262 83% 65%;
+    /* Focus rings use primary purple */
 
-    --radius: 0.75rem;
+    --radius: 1.5rem;
+    /* Larger, softer corners */
+  }
 
-    /* Premium Blue Palette */
-    --sky-blue-50: 204 100% 97%;
-    --sky-blue-100: 204 94% 94%;
-    --sky-blue-200: 201 94% 86%;
-    --sky-blue-300: 199 95% 74%;
-    --sky-blue-400: 198 93% 60%;
-    --sky-blue-500: 199 89% 48%;
-    --sky-blue-600: 200 98% 39%;
-    --sky-blue-700: 201 96% 32%;
-    --sky-blue-800: 201 90% 27%;
-    --sky-blue-900: 202 80% 24%;
+  /* Lenis Smooth Scroll Recommended CSS */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
 
-    /* Gradient Stops - Enhanced */
-    --gradient-start: 210 60% 88%;
-    --gradient-mid: 205 70% 82%;
-    --gradient-end: 199 80% 75%;
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+
+  .lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+  }
+
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+
+  .lenis.lenis-smooth iframe {
+    pointer-events: none;
+  }
+
+  /* Optimize scrolling performance */
+  body {
+    overscroll-behavior: none;
+    /* Apple-like 'no bounce' to contain the momentum */
   }
 
   * {
@@ -64,278 +88,197 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Hind Siliguri', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: linear-gradient(135deg,
-        hsl(var(--gradient-start)) 0%,
-        hsl(var(--gradient-mid)) 50%,
-        hsl(var(--gradient-end)) 100%);
-    background-attachment: fixed;
+    font-family: 'Hind Siliguri', 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* Clean premium white/purple very soft gradient */
+    background: linear-gradient(135deg, #ffffff 0%, #fefaff 50%, #f8f0ff 100%);
     min-height: 100vh;
     overflow-x: hidden;
-    will-change: scroll-position;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 }
 
 /* ======================================================
-   PREMIUM GLOW EFFECTS
+   PERFORMANCE OPTIMIZED GLASS
 ======================================================*/
 @layer components {
-  .premium-glow {
-    filter: drop-shadow(0 4px 12px hsl(var(--primary) / 0.25));
-  }
 
-  .premium-border {
-    border: 1px solid hsl(var(--primary) / 0.3);
-    box-shadow:
-      0 4px 16px hsl(var(--primary) / 0.1),
-      inset 0 1px 0 hsl(0 0% 100% / 0.5);
-  }
-}
-
-/* ======================================================
-   GLASS CARD (Premium Frosted Effect)
-======================================================*/
-@layer components {
+  /* 
+     High Performance Glass 
+     - Light Premium Glass
+  */
   .glass-card {
-    background: linear-gradient(135deg,
-        hsl(var(--card) / 0.95),
-        hsl(var(--card) / 0.90));
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
-    border: 2px solid hsl(var(--primary) / 0.15);
-    box-shadow:
-      0 8px 32px hsl(220 40% 15% / 0.12),
-      0 2px 8px hsl(220 40% 15% / 0.08),
-      inset 0 1px 1px hsl(0 0% 100% / 0.8);
+    @apply bg-white/70 border border-slate-200/50 shadow-xl;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: var(--radius);
+  }
+
+  .glass-panel {
+    @apply bg-white/80 border-l border-slate-200/50 shadow-sm;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  /* Apple-style smooth inputs (Light) */
+  .input-apple {
+    @apply bg-white border border-slate-200 rounded-2xl px-4 py-3 text-slate-900 placeholder:text-slate-400 transition-all duration-300 focus:bg-white focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none;
   }
 }
 
 /* ======================================================
-   APPLE-STYLE ANIMATIONS (Lag-Free, GPU Accelerated)
+   APPLE-STYLE ANIMATIONS
+   Using Cubic Bezier for that "Spring" feel without JS
 ======================================================*/
 @layer utilities {
-  .transition-apple {
-    transition-property: all;
-    transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    transition-duration: 0.35s;
-    will-change: transform, opacity;
-    transform: translateZ(0);
+
+  /* The "Apple" curve - smooth start, snappy end */
+  .ease-apple {
+    transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
   }
 
-  .transition-apple-slow {
-    transition-property: all;
-    transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  .transition-spring {
+    transition-property: transform, opacity, background-color, border-color, box-shadow;
     transition-duration: 0.5s;
-    will-change: transform, opacity;
+    transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Springy */
+  }
+
+  .hover-scale {
+    transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    will-change: transform;
     transform: translateZ(0);
+    /* Hardware accelerate */
+  }
+
+  .hover-scale:hover {
+    transform: scale(1.02) translateZ(0);
   }
 
   .hover-lift {
-    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-      box-shadow 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    will-change: transform;
-    transform: translateZ(0);
+    @apply hover-scale;
+    transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.4s ease;
   }
 
   .hover-lift:hover {
     transform: translateY(-4px) translateZ(0);
-    box-shadow: 0 12px 24px hsl(var(--primary) / 0.15);
+    box-shadow: 0 10px 30px -10px rgba(var(--primary), 0.3);
   }
 
-  .hover-scale-smooth {
-    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  /* CSS-Only Blobs Animation (No JS thread usage) */
+  @keyframes blob-float {
+
+    0%,
+    100% {
+      transform: translate(0, 0) scale(1);
+    }
+
+    33% {
+      transform: translate(30px, -50px) scale(1.1);
+    }
+
+    66% {
+      transform: translate(-20px, 20px) scale(0.9);
+    }
+  }
+
+  .animate-blob {
+    animation: blob-float 10s infinite cubic-bezier(0.4, 0, 0.2, 1);
     will-change: transform;
-    backface-visibility: hidden;
   }
 
-  .hover-scale-smooth:hover {
-    transform: scale(1.03) translateZ(0);
+  .delay-2000 {
+    animation-delay: 2s;
   }
 
-  .fade-in {
-    animation: fadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .delay-4000 {
+    animation-delay: 4s;
   }
 }
 
 /* ======================================================
-   PREMIUM BUTTON STYLES
+   CUSTOM SCROLLBAR (Minimalist)
 ======================================================*/
-@layer components {
-  .btn-premium {
-    background: linear-gradient(135deg,
-        hsl(var(--primary)) 0%,
-        hsl(var(--accent)) 100%);
-    color: white;
-    font-weight: 600;
-    padding: 0.75rem 1.5rem;
-    border-radius: 0.75rem;
-    border: none;
-    box-shadow:
-      0 4px 12px hsl(var(--primary) / 0.3),
-      inset 0 1px 0 hsl(0 0% 100% / 0.2);
-    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    will-change: transform, box-shadow;
-    transform: translateZ(0);
-  }
-
-  .btn-premium:hover {
-    transform: translateY(-2px) translateZ(0);
-    box-shadow:
-      0 8px 20px hsl(var(--primary) / 0.4),
-      inset 0 1px 0 hsl(0 0% 100% / 0.3);
-  }
-
-  .btn-premium:active {
-    transform: translateY(0) translateZ(0);
-    box-shadow:
-      0 2px 8px hsl(var(--primary) / 0.3),
-      inset 0 1px 0 hsl(0 0% 100% / 0.2);
-  }
-}
-
-/* ======================================================
-   SCROLL PERFORMANCE (GPU Optimized)
-======================================================*/
-html {
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  transform: translateZ(0);
-  backface-visibility: hidden;
-}
-
-.smooth-scroll {
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-  overflow-y: auto;
-  will-change: scroll-position;
-  contain: layout style paint;
-}
-
-/* Premium Scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
+  width: 6px;
+  /* Thinner */
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg,
-      hsl(var(--primary)),
-      hsl(var(--accent)));
-  border-radius: 5px;
-  border: 2px solid hsl(var(--background));
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg,
-      hsl(var(--accent)),
-      hsl(var(--primary)));
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Hide scrollbar for clean UI where needed */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* ======================================================
-   PREMIUM CARD EFFECTS
+   MOBILE PERFORMANCE — 60FPS ON 512MB RAM DEVICES
+   Disables expensive GPU effects on mobile
 ======================================================*/
-.premium-card {
-  background: linear-gradient(135deg,
-      hsl(0 0% 100% / 0.98),
-      hsl(0 0% 100% / 0.95));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 2px solid hsl(var(--border));
-  border-radius: 1rem;
-  box-shadow:
-    0 8px 32px hsl(220 40% 15% / 0.1),
-    0 2px 8px hsl(220 40% 15% / 0.06),
-    inset 0 1px 1px hsl(0 0% 100% / 1);
-  transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  will-change: transform, box-shadow;
-  transform: translateZ(0);
-}
+@media (max-width: 768px) {
 
-.premium-card:hover {
-  transform: translateY(-6px) translateZ(0);
-  border-color: hsl(var(--primary) / 0.4);
-  box-shadow:
-    0 16px 48px hsl(var(--primary) / 0.15),
-    0 4px 12px hsl(var(--primary) / 0.10),
-    inset 0 1px 1px hsl(0 0% 100% / 1);
-}
-
-/* ======================================================
-   GRADIENT BACKGROUNDS
-======================================================*/
-.bg-gradient-premium {
-  background: linear-gradient(135deg,
-      hsl(var(--gradient-start)) 0%,
-      hsl(var(--gradient-mid)) 50%,
-      hsl(var(--gradient-end)) 100%);
-}
-
-.bg-gradient-button {
-  background: linear-gradient(135deg,
-      hsl(var(--primary)) 0%,
-      hsl(var(--accent)) 100%);
-}
-
-/* ======================================================
-   LOADING & SKELETON (Smooth Shimmer)
-======================================================*/
-@keyframes shimmer {
-  0% {
-    background-position: -1000px 0;
+  /* Kill all backdrop-filter on mobile — biggest perf killer */
+  .glass-card,
+  .glass-panel,
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 
-  100% {
-    background-position: 1000px 0;
+  /* Compensate with solid semi-transparent BG for glass-card */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.92) !important;
+  }
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+
+  /* Reduce blob blur radius drastically */
+  .animate-blob {
+    animation-duration: 20s !important;
+    /* slower = less GPU work */
+  }
+
+  /* Disable mix-blend-mode on mobile — expensive compositing */
+  [class*="mix-blend"] {
+    mix-blend-mode: normal !important;
+  }
+
+  /* Force GPU layer promotion for all animated elements */
+  .hover-scale,
+  .hover-lift,
+  [class*="transition"] {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
   }
 }
 
-.skeleton {
-  background: linear-gradient(90deg,
-      hsl(var(--muted)) 0%,
-      hsl(var(--card)) 50%,
-      hsl(var(--muted)) 100%);
-  background-size: 2000px 100%;
-  animation: shimmer 2s infinite linear;
-}
+/* Respect user preferences for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-blob {
+    animation: none !important;
+  }
 
-/* ======================================================
-   PARALLAX (Lightweight GPU Version)
-======================================================*/
-.parallax-wrapper {
-  position: relative;
-  overflow: hidden;
-  perspective: 1000px;
-}
-
-.parallax-bg {
-  position: absolute;
-  inset: 0;
-  transform: translateZ(-2px) scale(1.3);
-  will-change: transform;
-  background-size: cover;
-  background-position: center;
-  z-index: -1;
-}
-
-.parallax-content {
-  position: relative;
-  z-index: 2;
+  .transition-spring,
+  .hover-scale,
+  .hover-lift {
+    transition-duration: 0.01ms !important;
+  }
 }

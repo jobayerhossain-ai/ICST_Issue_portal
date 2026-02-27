@@ -1,161 +1,54 @@
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
+const compression = require('compression');
+const crypto = require('crypto');
+const webpush = require('web-push');
 require('dotenv').config();
+
+const { neon } = require('@neondatabase/serverless');
+const { drizzle } = require('drizzle-orm/neon-http');
+const { eq, and, or, desc, sql } = require('drizzle-orm');
+
+// Import Drizzle Tables
+const schema = require('./schema');
+const { users, issues, issueVotedUsers, issueTimeline, auditLogs, systemConfig, articles, messages, passwordResetTokens, comments, pushSubscriptions } = schema;
+
+// ★ WEB PUSH — VAPID Configuration
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BAB6F7jBcqVjNd0fstPiK4NtwW8EdJsSsTScO-LhfAaFxX4HtlLgsCRgFzMGrxTZIIix3GwjqMS9ay4P2bNzzv0';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '-FnSpzQsw6X_IuCEjtLp-70oMl1M3Z92cdL8v2zNYCw';
+webpush.setVapidDetails('mailto:jovayerhossain0@gmail.com', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+
+// Initialize Postgres & Drizzle
+const sqlClient = neon(process.env.DATABASE_URL);
+const db = drizzle(sqlClient, { schema });
 
 const { sendEmail, sendBulkEmails, emailTemplates } = require('./emailService');
 
 const app = express();
+app.use(compression());
 
 const ALLOWED_ORIGINS = [
     'https://icst-issue-portal.vercel.app',
     'https://icst-issue-portal-git-main-jobayer-hossains-projects-0897a257.vercel.app',
-    'http://localhost:5173'
+    'http://localhost:5173',
+    'http://localhost:8080',
+    'http://localhost:8081',
+    'http://192.168.31.107:8080',
+    'http://192.168.31.107:5173'
 ];
 
 app.use(cors({
-    origin: (origin, callback) => {
-        if (!origin || ALLOWED_ORIGINS.some(o => origin.startsWith(o))) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: '*', // Temporarily allow all for local dev testing with vite
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
 }));
 
 app.use(express.json());
 
-// --- MONGODB CONNECTION ---
-const MONGODB_URI = "mongodb+srv://Jobayer:Jovayer1234%26@cluster0.ipt18un.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
-
-let cachedDb = null;
-
-async function connectToDatabase() {
-    if (cachedDb && mongoose.connection.readyState === 1) {
-        return cachedDb;
-    }
-    try {
-        cachedDb = await mongoose.connect(MONGODB_URI, {
-            serverSelectionTimeoutMS: 20000,
-            socketTimeoutMS: 45000,
-            bufferCommands: true
-        });
-        console.log('✅ Connected to MongoDB Atlas');
-        return cachedDb;
-    } catch (err) {
-        console.error('❌ MongoDB connection error:', err);
-        throw err;
-    }
-}
-
-app.use(async (req, res, next) => {
-    try {
-        await connectToDatabase();
-        next();
-    } catch (err) {
-        console.error("Database connection failure:", err.message);
-        res.status(500).json({ message: `Database connection error: ${err.message}` });
-    }
-});
-
-// --- MODELS ---
-
-const UserSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: { type: String, default: 'user' },
-    department: String,
-    roll: String,
-    isBlocked: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now }
-});
-
-const AuditLogSchema = new mongoose.Schema({
-    adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    targetId: String,
-    targetType: String, // 'user', 'issue', 'system'
-    action: String, // 'block_user', 'change_status', etc.
-    details: String,
-    ip: String,
-    timestamp: { type: Date, default: Date.now }
-});
-
-const SystemConfigSchema = new mongoose.Schema({
-    categories: [String],
-    priorities: [String],
-    maintenanceMode: { type: Boolean, default: false },
-    allowRegistration: { type: Boolean, default: true },
-    slaRules: Object
-});
-
-const ArticleSchema = new mongoose.Schema({
-    title: { type: String, required: true },
-    content: { type: String, required: true },
-    category: { type: String, default: 'FAQ' },
-    tags: [String],
-    views: { type: Number, default: 0 },
-    helpful: { type: Number, default: 0 },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-});
-
-const IssueSchema = new mongoose.Schema({
-    title: { type: String, required: true },
-    description: { type: String, required: true },
-    category: { type: String, required: true },
-    priority: { type: String, default: 'medium' },
-    status: { type: String, default: 'pending' },
-    votes: {
-        good: { type: Number, default: 0 },
-        bad: { type: Number, default: 0 }
-    },
-    submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    votedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    views: { type: Number, default: 0 },
-    timeline: [{
-        status: String,
-        updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        note: String,
-        timestamp: { type: Date, default: Date.now }
-    }],
-    expectedResolution: Date,
-    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-});
-
-const MessageSchema = new mongoose.Schema({
-    from: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    to: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // null for broadcast
-    subject: String,
-    message: String,
-    read: { type: Boolean, default: false },
-    type: { type: String, default: 'direct' },
-    targetGroup: String,
-    createdAt: { type: Date, default: Date.now }
-});
-
-const PasswordResetTokenSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    token: { type: String, required: true, unique: true },
-    expiresAt: { type: Date, required: true },
-    used: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now }
-});
-
-const User = mongoose.model('User', UserSchema);
-const Issue = mongoose.model('Issue', IssueSchema);
-const Message = mongoose.model('Message', MessageSchema);
-const AuditLog = mongoose.model('AuditLog', AuditLogSchema);
-const SystemConfig = mongoose.model('SystemConfig', SystemConfigSchema);
-const Article = mongoose.model('Article', ArticleSchema);
-const PasswordResetToken = mongoose.model('PasswordResetToken', PasswordResetTokenSchema);
+// Remove Mongoose database check middleware (Neon Serverless handles this automatically)
 
 // --- AUTH MIDDLEWARE ---
 const authenticateToken = (req, res, next) => {
@@ -170,10 +63,28 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+const optionalAuthenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) {
+        req.user = null;
+        return next();
+    }
+
+    jwt.verify(token, 'secret_key', (err, user) => {
+        if (err) {
+            req.user = null;
+        } else {
+            req.user = user;
+        }
+        next();
+    });
+};
+
 // Maintenance Mode Check Middleware
 const checkMaintenanceMode = async (req, res, next) => {
     try {
-        const config = await SystemConfig.findOne();
+        const config = await db.select().from(systemConfig).limit(1).then(r => r[0]);
 
         // If maintenance mode is on and user is not admin, block access
         if (config && config.maintenanceMode && req.user && req.user.role !== 'admin') {
@@ -200,7 +111,7 @@ const requireAdmin = (req, res, next) => {
 
 // Permission Helper Functions
 const canUpdateIssue = (user, issue) => {
-    return user.role === 'admin' || issue.submittedBy?.toString() === user.id;
+    return user.role === 'admin' || issue.submittedBy === user.id;
 };
 
 const canDeleteIssue = (user) => {
@@ -213,22 +124,101 @@ const canSendMessage = (user) => {
 
 // --- ROUTES ---
 
+// ★ AUTO-CREATE push_subscriptions table on startup
+(async () => {
+    try {
+        await sqlClient(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id),
+            endpoint TEXT NOT NULL,
+            keys JSONB NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        )`);
+        console.log('✅ push_subscriptions table ready');
+    } catch (err) {
+        console.log('push_subscriptions table check:', err.message);
+    }
+})();
+
+// ★ PUSH NOTIFICATION HELPER — sends push to all of a user's subscribed devices
+async function sendPushToUser(userId, payload) {
+    try {
+        const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+        const payloadStr = JSON.stringify(payload);
+        for (const sub of subs) {
+            try {
+                await webpush.sendNotification({
+                    endpoint: sub.endpoint,
+                    keys: sub.keys
+                }, payloadStr);
+            } catch (err) {
+                // If subscription expired/invalid, remove it
+                if (err.statusCode === 410 || err.statusCode === 404) {
+                    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Push notification error:', err.message);
+    }
+}
+
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: 'ICST Portal Backend v2.1 (Node.js)' });
+    res.json({ status: 'ok', message: 'ICST Portal Backend v2.3 (Neon + Web Push)' });
+});
+
+// ★ PUSH NOTIFICATION ENDPOINTS
+app.get('/api/user/push/vapid-public-key', (req, res) => {
+    res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post('/api/user/push/subscribe', authenticateToken, async (req, res) => {
+    try {
+        const { endpoint, keys } = req.body;
+        if (!endpoint || !keys) return res.status(400).json({ message: 'Invalid subscription' });
+
+        // Remove existing subscription for this endpoint (avoid duplicates)
+        await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+
+        // Save new subscription
+        await db.insert(pushSubscriptions).values({
+            userId: req.user.id,
+            endpoint,
+            keys
+        });
+
+        res.json({ message: 'Subscribed successfully' });
+    } catch (err) {
+        console.error('Push subscribe error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+app.post('/api/user/push/unsubscribe', authenticateToken, async (req, res) => {
+    try {
+        const { endpoint } = req.body;
+        if (endpoint) {
+            await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+        }
+        res.json({ message: 'Unsubscribed' });
+    } catch (err) {
+        console.error('Push unsubscribe error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
 });
 
 // Auth
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.findOne({ email });
+        const user = await db.select().from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
         if (!user || !(await bcrypt.compare(password, user.password))) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
-        const token = jwt.sign({ id: user._id, role: user.role }, 'secret_key', { expiresIn: '7d' });
+        const token = jwt.sign({ id: user.id, role: user.role }, 'secret_key', { expiresIn: '7d' });
         res.json({
             token,
-            _id: user._id,
+            _id: user.id, // Aliased for legacy frontend support
             name: user.name,
             email: user.email,
             role: user.role,
@@ -236,6 +226,7 @@ app.post('/api/auth/login', async (req, res) => {
             roll: user.roll
         });
     } catch (err) {
+        console.error(err);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -249,14 +240,13 @@ app.post('/api/auth/forgot-password', async (req, res) => {
             return res.status(400).json({ message: 'Email is required' });
         }
 
-        const user = await User.findOne({ email });
+        const user = await db.select().from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
 
         // For security, always return success message even if user doesn't exist
         if (!user) {
             return res.json({ message: 'If this email exists, a reset link has been sent' });
         }
 
-        // Generate unique reset token
         const crypto = require('crypto');
         const resetToken = crypto.randomBytes(32).toString('hex');
 
@@ -264,11 +254,11 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
         // Delete any existing tokens for this user
-        await PasswordResetToken.deleteMany({ userId: user._id });
+        await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, user.id));
 
         // Create new reset token
-        await PasswordResetToken.create({
-            userId: user._id,
+        await db.insert(passwordResetTokens).values({
+            userId: user.id,
             token: resetToken,
             expiresAt
         });
@@ -300,11 +290,13 @@ app.post('/api/auth/reset-password', async (req, res) => {
         }
 
         // Find valid token
-        const resetToken = await PasswordResetToken.findOne({
-            token,
-            used: false,
-            expiresAt: { $gt: new Date() }
-        }).populate('userId');
+        const resetTokenArr = await db.select().from(passwordResetTokens).where(
+            and(
+                eq(passwordResetTokens.token, token),
+                eq(passwordResetTokens.used, false)
+            )
+        );
+        const resetToken = resetTokenArr.find(t => new Date(t.expiresAt) > new Date());
 
         if (!resetToken) {
             return res.status(400).json({
@@ -315,11 +307,10 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
         // Update user password
         const hashedPassword = await bcrypt.hash(newPassword, 8);
-        await User.findByIdAndUpdate(resetToken.userId._id, { password: hashedPassword });
+        await db.update(users).set({ password: hashedPassword }).where(eq(users.id, resetToken.userId));
 
         // Mark token as used
-        resetToken.used = true;
-        await resetToken.save();
+        await db.update(passwordResetTokens).set({ used: true }).where(eq(passwordResetTokens.id, resetToken.id));
 
         res.json({
             message: 'Password reset successful. You can now login with your new password.',
@@ -336,7 +327,7 @@ const SALT_ROUNDS = 8; // Optimized for Vercel performance while maintaining sec
 app.post('/api/auth/register', async (req, res) => {
     try {
         // Check if registration is allowed
-        const config = await SystemConfig.findOne();
+        const config = await db.select().from(systemConfig).limit(1).then(r => r[0]);
         if (config && config.allowRegistration === false) {
             return res.status(403).json({
                 message: 'Registration is currently disabled. Please contact administrator.',
@@ -345,24 +336,39 @@ app.post('/api/auth/register', async (req, res) => {
         }
 
         const { name, email, password, department, roll } = req.body;
-        if (await User.findOne({ email })) return res.status(400).json({ message: 'User exists' });
+
+        const existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
+        if (existingUser) return res.status(400).json({ message: 'User exists' });
 
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-        const newUser = await User.create({ name, email, password: hashedPassword, department, roll });
-        const token = jwt.sign({ id: newUser._id, role: newUser.role }, 'secret_key', { expiresIn: '7d' });
+
+        const [newUser] = await db.insert(users).values({ name, email, password: hashedPassword, department, roll }).returning();
+
+        const token = jwt.sign({ id: newUser.id, role: newUser.role }, 'secret_key', { expiresIn: '7d' });
 
         // Send welcome email (don't await to avoid blocking)
         sendEmail(email, emailTemplates.welcome, [name])
             .catch(err => console.error('Failed to send welcome email:', err));
 
-        res.status(201).json({ token, ...newUser.toObject() });
+        res.status(201).json({ token, _id: newUser.id, ...newUser });
     } catch (err) {
         res.status(500).json({ message: 'Server error' });
     }
 });
 
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await db.select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        department: users.department,
+        roll: users.roll,
+        isBlocked: users.isBlocked,
+        createdAt: users.createdAt
+    }).from(users).where(eq(users.id, req.user.id)).limit(1).then(r => r[0]);
+
+    if (user) user._id = user.id; // Map id for frontend compatibility
     res.json(user);
 });
 
@@ -371,16 +377,14 @@ app.get('/api/auth/seed-admin', async (req, res) => {
     const password = "Jovayer1234&";
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-    let user = await User.findOne({ email });
+    let user = await db.select().from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
 
     if (user) {
-        user.password = hashedPassword;
-        user.role = "admin"; // Ensure admin role
-        await user.save();
+        await db.update(users).set({ password: hashedPassword, role: "admin" }).where(eq(users.id, user.id));
         return res.json({ message: 'Admin password reset to: Jovayer1234&' });
     }
 
-    await User.create({
+    await db.insert(users).values({
         name: "Administrator",
         email,
         password: hashedPassword,
@@ -393,107 +397,246 @@ app.get('/api/auth/seed-admin', async (req, res) => {
 
 // Issues
 // NOTE: GET /api/issues is INTENTIONALLY PUBLIC
+// ★ CLOUDINARY UPLOAD CONFIGURATION
+const cloudinary = require('cloudinary').v2;
+const streamifier = require('streamifier');
+
+if (process.env.CLOUDINARY_URL) {
+    cloudinary.config(); // Automatically picks up CLOUDINARY_URL
+} else {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+}
+
+const fileUploadMiddleware = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5 MB limit
+    },
+});
+
+app.post('/api/upload', authenticateToken, fileUploadMiddleware.single('image'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No image provided' });
+        }
+
+        const uploadStream = cloudinary.uploader.upload_stream(
+            {
+                folder: 'icst-issue-portal',
+                resource_type: 'image',
+                transformation: [
+                    { width: 800, crop: "scale" }, // Resize to keep sizes low
+                    { quality: "auto", fetch_format: "auto" } // Auto optimize
+                ]
+            },
+            (error, result) => {
+                if (error) {
+                    console.error('Cloudinary upload error:', error);
+                    return res.status(500).json({ message: 'Image upload failed' });
+                }
+                res.status(200).json({ imageUrl: result.secure_url });
+            }
+        );
+
+        streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+    } catch (err) {
+        console.error('Upload Error:', err);
+        res.status(500).json({ message: "Server Error during upload" });
+    }
+});
+
+
 // The issue board is designed to be publicly accessible for transparency
 // All users (including non-authenticated) can view the list of issues
+// CACHE OPTIMIZATION: Cache globally at CDN level (s-maxage) and browser level (max-age)
 app.get('/api/issues', async (req, res) => {
-    const issues = await Issue.find().sort({ createdAt: -1 });
-    res.json(issues);
+    res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=120');
+    try {
+        // Filter at DB level: only return non-pending issues for public view
+        const issuesData = await db.select().from(issues)
+            .where(sql`${issues.status} != 'pending'`)
+            .orderBy(desc(issues.createdAt));
+        // Remap id to _id for frontend components expecting MongoDB format
+        const mappedIssues = issuesData.map(i => ({
+            ...i,
+            _id: i.id,
+            votes: i.votesGood - i.votesBad // Simplify to net votes
+        }));
+        res.json(mappedIssues);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json([]);
+    }
 });
 
 app.post('/api/issues', authenticateToken, checkMaintenanceMode, async (req, res) => {
     try {
-        const issue = await Issue.create({
-            ...req.body,
+        const { title, description, category, priority, imageUrl } = req.body;
+        const [issue] = await db.insert(issues).values({
+            title,
+            description,
+            category,
+            priority: priority || 'medium',
+            status: 'pending',
             submittedBy: req.user.id,
-            votes: { good: 0, bad: 0 },
-            views: 0
-        });
+            votesGood: 0,
+            votesBad: 0,
+            views: 0,
+            imageUrl: imageUrl || null
+        }).returning();
+
+        issue._id = issue.id;
+        issue.votes = issue.votesGood - issue.votesBad;
+
         res.status(201).json(issue);
     } catch (err) {
+        console.error(err);
         res.status(500).json({ message: "Server Error" });
     }
 });
 
 // View single issue - Requires authentication to prevent view count manipulation
-app.get('/api/issues/:id', authenticateToken, checkMaintenanceMode, async (req, res) => {
-    const issue = await Issue.findById(req.params.id).populate('submittedBy', 'name');
-    if (!issue) return res.status(404).json({ message: "Not found" });
+app.get('/api/issues/:id', optionalAuthenticateToken, checkMaintenanceMode, async (req, res) => {
+    try {
+        const issueRows = await db.select({
+            issue: issues,
+            submitter: users
+        })
+            .from(issues)
+            .leftJoin(users, eq(issues.submittedBy, users.id))
+            .where(eq(issues.id, req.params.id))
+            .limit(1);
 
-    // Increment view (only counted for authenticated users)
-    issue.views += 1;
-    await issue.save();
+        if (!issueRows.length) return res.status(404).json({ message: "Not found" });
 
-    // Transform votedUsers array into a generic object map { userId: "voted" } for frontend compatibility if needed
-    const issueObj = issue.toObject();
-    issueObj.voters = {};
-    if (issue.votedUsers) {
-        issue.votedUsers.forEach(uid => {
-            issueObj.voters[uid.toString()] = "voted";
+        const row = issueRows[0];
+        const issue = row.issue;
+
+        // Increment view (only counted for authenticated users)
+        if (req.user) {
+            await db.update(issues).set({ views: issue.views + 1 }).where(eq(issues.id, issue.id));
+            issue.views += 1;
+        }
+
+        // Fetch voted users and their sentiments
+        const votersData = await db.select({
+            userId: issueVotedUsers.userId,
+            type: issueVotedUsers.type,
+            name: users.name
+        })
+            .from(issueVotedUsers)
+            .leftJoin(users, eq(issueVotedUsers.userId, users.id))
+            .where(eq(issueVotedUsers.issueId, issue.id));
+
+        const votersMap = {};
+        const votersList = [];
+        votersData.forEach(v => {
+            votersMap[v.userId] = v.type || "voted";
+            votersList.push({
+                _id: v.userId,
+                name: v.name || 'Unknown User',
+                type: v.type || 'good'
+            });
         });
-    }
 
-    res.json(issueObj);
+        const issueObj = {
+            ...issue,
+            _id: issue.id,
+            votes: issue.votesGood - issue.votesBad,
+            submittedBy: row.submitter ? { _id: row.submitter.id, name: row.submitter.name } : null,
+            voters: votersMap,
+            votersList: votersList
+        };
+
+        res.json(issueObj);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
+    }
 });
 
 app.patch('/api/issues/:id', authenticateToken, checkMaintenanceMode, async (req, res) => {
-    const issue = await Issue.findById(req.params.id);
-    if (!issue) return res.status(404).json({ message: "Not found" });
+    try {
+        const issue = await db.select().from(issues).where(eq(issues.id, req.params.id)).limit(1).then(r => r[0]);
 
-    // Check permission
-    if (req.user.role !== 'admin' && issue.submittedBy?.toString() !== req.user.id) {
-        return res.status(403).json({ message: "Unauthorized" });
+        if (!issue) return res.status(404).json({ message: "Not found" });
+
+        // Check permission
+        if (req.user.role !== 'admin' && issue.submittedBy !== req.user.id) {
+            return res.status(403).json({ message: "Unauthorized" });
+        }
+
+        const oldStatus = issue.status;
+
+        const updateData = { ...req.body, updatedAt: new Date() };
+        delete updateData._id; // Prevent updating PK
+        if (updateData.id) delete updateData.id;
+
+        const [updatedIssue] = await db.update(issues).set(updateData).where(eq(issues.id, req.params.id)).returning();
+        updatedIssue._id = updatedIssue.id;
+
+        // Audit log for admin actions
+        if (req.user.role === 'admin') {
+            try {
+                await db.insert(auditLogs).values({
+                    adminId: req.user.id,
+                    targetId: updatedIssue.id,
+                    targetType: 'issue',
+                    action: req.body.status ? 'update_status' : 'update_issue',
+                    details: req.body.status
+                        ? `Status changed from "${oldStatus}" to "${req.body.status}" for issue "${updatedIssue.title}"`
+                        : `Issue "${updatedIssue.title}" updated`,
+                    ip: req.ip
+                });
+            } catch (auditError) {
+                console.error('Audit log failed:', auditError);
+            }
+        }
+
+        res.json(updatedIssue);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
     }
+});
 
-    const oldStatus = issue.status;
-    Object.assign(issue, req.body);
-    issue.updatedAt = Date.now();
-    await issue.save();
+app.delete('/api/issues/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
 
-    // Audit log for admin actions
-    if (req.user.role === 'admin') {
+        const issue = await db.select().from(issues).where(eq(issues.id, req.params.id)).limit(1).then(r => r[0]);
+        if (!issue) return res.status(404).json({ message: "Not found" });
+
+        const issueTitle = issue.title;
+
+        // Delete dependencies first
+        await db.delete(issueVotedUsers).where(eq(issueVotedUsers.issueId, req.params.id));
+        await db.delete(issueTimeline).where(eq(issueTimeline.issueId, req.params.id));
+        await db.delete(issues).where(eq(issues.id, req.params.id));
+
+        // Audit log
         try {
-            await AuditLog.create({
+            await db.insert(auditLogs).values({
                 adminId: req.user.id,
-                targetId: issue._id,
+                targetId: req.params.id,
                 targetType: 'issue',
-                action: req.body.status ? 'update_status' : 'update_issue',
-                details: req.body.status
-                    ? `Status changed from "${oldStatus}" to "${req.body.status}" for issue "${issue.title}"`
-                    : `Issue "${issue.title}" updated`,
+                action: 'delete_issue',
+                details: `Issue "${issueTitle}" permanently deleted`,
                 ip: req.ip
             });
         } catch (auditError) {
             console.error('Audit log failed:', auditError);
         }
+
+        res.json({ message: "Deleted" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
     }
-
-    res.json(issue);
-});
-
-app.delete('/api/issues/:id', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: "Admin only" });
-
-    const issue = await Issue.findById(req.params.id);
-    if (!issue) return res.status(404).json({ message: "Not found" });
-
-    const issueTitle = issue.title;
-    await Issue.findByIdAndDelete(req.params.id);
-
-    // Audit log
-    try {
-        await AuditLog.create({
-            adminId: req.user.id,
-            targetId: req.params.id,
-            targetType: 'issue',
-            action: 'delete_issue',
-            details: `Issue "${issueTitle}" permanently deleted`,
-            ip: req.ip
-        });
-    } catch (auditError) {
-        console.error('Audit log failed:', auditError);
-    }
-
-    res.json({ message: "Deleted" });
 });
 
 // Issue Status Update (for PendingIssues approval workflow)
@@ -504,29 +647,41 @@ app.put('/api/issues/:id/status', authenticateToken, async (req, res) => {
             return res.status(403).json({ message: 'Admin only' });
         }
 
-        const issue = await Issue.findById(req.params.id);
+        const issue = await db.select().from(issues).where(eq(issues.id, req.params.id)).limit(1).then(r => r[0]);
         if (!issue) return res.status(404).json({ message: 'Issue not found' });
 
         const oldStatus = issue.status;
-        issue.status = req.body.status;
-        issue.updatedAt = Date.now();
-        await issue.save();
+        const [updatedIssue] = await db.update(issues).set({
+            status: req.body.status,
+            updatedAt: new Date()
+        }).where(eq(issues.id, req.params.id)).returning();
 
         // Audit log
         try {
-            await AuditLog.create({
+            await db.insert(auditLogs).values({
                 adminId: req.user.id,
-                targetId: issue._id,
+                targetId: updatedIssue.id,
                 targetType: 'issue',
                 action: 'update_status',
-                details: `Status changed from "${oldStatus}" to "${req.body.status}" for issue "${issue.title}"`,
+                details: `Status changed from "${oldStatus}" to "${req.body.status}" for issue "${updatedIssue.title}"`,
                 ip: req.ip
             });
         } catch (auditError) {
             console.error('Audit log failed:', auditError);
         }
 
-        res.json({ message: 'Status updated', issue });
+        updatedIssue._id = updatedIssue.id;
+        res.json({ message: 'Status updated', issue: updatedIssue });
+
+        // ★ PUSH NOTIFICATION: Status change -> notify issue owner
+        if (updatedIssue.submittedBy) {
+            const statusLabels = { 'pending': 'পেন্ডিং', 'in-progress': 'প্রসেসিং', 'resolved': 'সমাধান হয়েছে', 'rejected': 'প্রত্যাখ্যান' };
+            sendPushToUser(updatedIssue.submittedBy, {
+                title: 'ইস্যু আপডেট 📢',
+                body: `আপনার ইস্যু "${updatedIssue.title}" এর স্ট্যাটাস: ${statusLabels[req.body.status] || req.body.status}`,
+                url: `/issues/${updatedIssue.id}`
+            });
+        }
     } catch (error) {
         console.error('Error updating status:', error);
         res.status(500).json({ message: 'Failed to update status' });
@@ -535,379 +690,794 @@ app.put('/api/issues/:id/status', authenticateToken, async (req, res) => {
 
 // Voting (PUT to match frontend IssueCard line 132: api.put)
 app.put('/api/issues/:id/vote', authenticateToken, checkMaintenanceMode, async (req, res) => {
-    const issue = await Issue.findById(req.params.id);
-    if (!issue) return res.status(404).json({ message: "Not found" });
+    try {
+        const issue = await db.select().from(issues).where(eq(issues.id, req.params.id)).limit(1).then(r => r[0]);
+        if (!issue) return res.status(404).json({ message: "Not found" });
 
-    const userId = req.user.id;
-    // Check if user ID is in votedUsers array
-    const hasVoted = issue.votedUsers.some(uid => uid.toString() === userId);
+        const userId = req.user.id;
 
-    if (hasVoted) {
-        return res.status(400).json({ message: "already" });
+        // Check if user ID is in votedUsers array
+        const existingVote = await db.select().from(issueVotedUsers).where(
+            and(
+                eq(issueVotedUsers.issueId, issue.id),
+                eq(issueVotedUsers.userId, userId)
+            )
+        ).limit(1).then(r => r[0]);
+
+        if (existingVote) {
+            return res.status(400).json({ message: "already" });
+        }
+
+        const type = req.body.type; // 'good' or 'bad'
+        let newVotesGood = issue.votesGood;
+        let newVotesBad = issue.votesBad;
+
+        if (type === 'good') newVotesGood += 1;
+        if (type === 'bad') newVotesBad += 1;
+
+        await db.update(issues).set({
+            votesGood: newVotesGood,
+            votesBad: newVotesBad
+        }).where(eq(issues.id, issue.id));
+
+        await db.insert(issueVotedUsers).values({
+            issueId: issue.id,
+            userId: userId,
+            type: type // Save the exact vote sentiment ('good' or 'bad')
+        });
+
+        // Prepare response format matching frontend IssueCard expectations
+        const votersData = await db.select().from(issueVotedUsers).where(eq(issueVotedUsers.issueId, issue.id));
+        const votersMap = {};
+        votersData.forEach(v => votersMap[v.userId] = v.type || "voted");
+
+        const issueObj = {
+            ...issue,
+            _id: issue.id,
+            votesGood: newVotesGood,
+            votesBad: newVotesBad,
+            votes: {
+                good: newVotesGood,
+                bad: newVotesBad
+            },
+            voters: votersMap
+        };
+
+        res.json(issueObj);
+
+        // ★ PUSH NOTIFICATION: Vote -> notify issue owner
+        if (issue.submittedBy && issue.submittedBy !== userId) {
+            sendPushToUser(issue.submittedBy, {
+                title: 'নতুন ভোট 👍',
+                body: `কেউ আপনার ইস্যু "${issue.title}" তে ভোট দিয়েছেন`,
+                url: `/issues/${issue.id}`
+            });
+        }
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
     }
+});
 
-    const type = req.body.type; // 'good' or 'bad'
-    if (type === 'good') issue.votes.good += 1;
-    if (type === 'bad') issue.votes.bad += 1;
+// Comments API
+app.get('/api/issues/:id/comments', async (req, res) => {
+    try {
+        const issueId = req.params.id;
+        // Fetch comments with user details
+        const commentsData = await db.select({
+            _id: comments.id,
+            text: comments.text,
+            parentId: comments.parentId,
+            timestamp: comments.createdAt,
+            username: users.name
+        })
+            .from(comments)
+            .leftJoin(users, eq(comments.userId, users.id))
+            .where(eq(comments.issueId, issueId))
+            .orderBy(desc(comments.createdAt));
 
-    issue.votedUsers.push(userId);
-    await issue.save();
+        res.json(commentsData);
+    } catch (err) {
+        console.error('Error fetching comments:', err);
+        res.status(500).json([]);
+    }
+});
 
-    // Prepare response format matching frontend IssueCard expectations
-    const issueObj = issue.toObject();
-    issueObj.voters = {};
-    issue.votedUsers.forEach(uid => {
-        issueObj.voters[uid.toString()] = "voted";
-    });
+app.post('/api/issues/:id/comments', authenticateToken, checkMaintenanceMode, async (req, res) => {
+    try {
+        const issueId = req.params.id;
+        const { text, parentId } = req.body;
+        const userId = req.user.id;
 
-    res.json(issueObj);
+        if (!text || text.trim() === '') {
+            return res.status(400).json({ message: "Comment text is required" });
+        }
+
+        // Verify issue exists
+        const issueExists = await db.select().from(issues).where(eq(issues.id, issueId)).limit(1).then(r => r[0]);
+        if (!issueExists) {
+            return res.status(404).json({ message: "Issue not found" });
+        }
+
+        const [newComment] = await db.insert(comments).values({
+            issueId,
+            userId,
+            text,
+            parentId: parentId && parentId.trim() !== "" ? parentId : null
+        }).returning();
+
+        // Fetch user name to append to the response
+        const user = await db.select({ name: users.name }).from(users).where(eq(users.id, userId)).limit(1).then(r => r[0]);
+
+        res.status(201).json({
+            _id: newComment.id,
+            text: newComment.text,
+            parentId: newComment.parentId,
+            timestamp: newComment.createdAt,
+            username: user ? user.name : 'Unknown User'
+        });
+
+        // ★ PUSH NOTIFICATION: Comment -> notify issue owner
+        if (issueExists.submittedBy && issueExists.submittedBy !== userId) {
+            const commenterName = user ? user.name : 'কেউ';
+            sendPushToUser(issueExists.submittedBy, {
+                title: 'নতুন কমেন্ট 💬',
+                body: `${commenterName} আপনার ইস্যু "${issueExists.title}" তে কমেন্ট করেছেন`,
+                url: `/issues/${issueId}`
+            });
+        }
+    } catch (err) {
+        console.error('Error posting comment:', err);
+        res.status(500).json({ message: "Server Error" });
+    }
 });
 
 // User Dashboard Stats
 app.get('/api/user/stats', authenticateToken, checkMaintenanceMode, async (req, res) => {
-    const userId = req.user.id;
+    try {
+        const userId = req.user.id;
 
-    const total = await Issue.countDocuments({ submittedBy: userId });
-    const pending = await Issue.countDocuments({ submittedBy: userId, status: 'pending' });
-    const inProgress = await Issue.countDocuments({ submittedBy: userId, status: 'in-progress' });
-    const resolved = await Issue.countDocuments({ submittedBy: userId, status: 'resolved' });
-    const criticalCount = await Issue.countDocuments({
-        submittedBy: userId,
-        priority: { $in: ['high', 'critical'] },
-        status: { $ne: 'resolved' }
-    });
+        // Use Promise.all to execute queries concurrently
+        const [totalRes, pendingRes, inProgressRes, resolvedRes, criticalRes] = await Promise.all([
+            db.select({ count: sql`count(*)` }).from(issues).where(eq(issues.submittedBy, userId)),
+            db.select({ count: sql`count(*)` }).from(issues).where(and(eq(issues.submittedBy, userId), eq(issues.status, 'pending'))),
+            db.select({ count: sql`count(*)` }).from(issues).where(and(eq(issues.submittedBy, userId), eq(issues.status, 'in-progress'))),
+            db.select({ count: sql`count(*)` }).from(issues).where(and(eq(issues.submittedBy, userId), eq(issues.status, 'resolved'))),
+            db.select({ count: sql`count(*)` }).from(issues).where(
+                and(
+                    eq(issues.submittedBy, userId),
+                    or(eq(issues.priority, 'high'), eq(issues.priority, 'critical')),
+                    sql`${issues.status} != 'resolved'`
+                )
+            )
+        ]);
 
-    res.json({ total, pending, inProgress, resolved, criticalCount, avgResolutionTime: 0 });
+        res.json({
+            total: Number(totalRes[0].count),
+            pending: Number(pendingRes[0].count),
+            inProgress: Number(inProgressRes[0].count),
+            resolved: Number(resolvedRes[0].count),
+            criticalCount: Number(criticalRes[0].count),
+            avgResolutionTime: 0
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
+    }
 });
 
 // User Activities
 app.get('/api/user/activities', authenticateToken, checkMaintenanceMode, async (req, res) => {
-    const userId = req.user.id;
+    try {
+        const userId = req.user.id;
 
-    const recentIssues = await Issue.find({ submittedBy: userId })
-        .sort({ updatedAt: -1 })
-        .limit(10);
+        const recentIssues = await db.select().from(issues)
+            .where(eq(issues.submittedBy, userId))
+            .orderBy(desc(issues.updatedAt))
+            .limit(10);
 
-    const activities = recentIssues.map(issue => ({
-        id: issue._id,
-        type: 'issue_update',
-        message: `Issue "${issue.title}" - Status: ${issue.status}`,
-        timestamp: issue.updatedAt
-    }));
+        const activities = recentIssues.map(issue => ({
+            id: issue.id,
+            type: 'issue_update',
+            message: `Issue "${issue.title}" - Status: ${issue.status}`,
+            timestamp: issue.updatedAt
+        }));
 
-    res.json(activities);
+        res.json(activities);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json([]);
+    }
 });
 
 // User Announcements
 app.get('/api/user/announcements', authenticateToken, checkMaintenanceMode, async (req, res) => {
-    // Fetch broadcast messages as announcements
-    const announcements = await Message.find({ type: 'broadcast' })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select('subject message createdAt');
+    try {
+        const announcements = await db.select({
+            id: messages.id,
+            subject: messages.subject,
+            message: messages.message,
+            createdAt: messages.createdAt
+        })
+            .from(messages)
+            .where(eq(messages.type, 'broadcast'))
+            .orderBy(desc(messages.createdAt))
+            .limit(5);
 
-    const formatted = announcements.map(a => ({
-        _id: a._id,
-        title: a.subject || 'System Announcement',
-        message: a.message,
-        type: 'info',
-        createdAt: a.createdAt
-    }));
+        const formatted = announcements.map(a => ({
+            _id: a.id,
+            title: a.subject || 'System Announcement',
+            message: a.message,
+            type: 'info',
+            createdAt: a.createdAt
+        }));
 
-    res.json(formatted);
+        res.json(formatted);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json([]);
+    }
+});
+
+// ★ REAL DYNAMIC USER NOTIFICATIONS
+// Generates notifications from actual user data: issue status changes, votes, comments, announcements
+app.get('/api/user/notifications', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const notifications = [];
+
+        // 1. Issue Status Updates — issues owned by user that were recently updated
+        const userIssues = await db.select().from(issues)
+            .where(eq(issues.submittedBy, userId))
+            .orderBy(desc(issues.updatedAt))
+            .limit(20);
+
+        for (const issue of userIssues) {
+            // Only show if updatedAt is different from createdAt (meaning it was actually updated)
+            if (issue.updatedAt && issue.createdAt &&
+                new Date(issue.updatedAt).getTime() !== new Date(issue.createdAt).getTime()) {
+
+                const statusLabels = {
+                    'pending': 'পেন্ডিং',
+                    'in-progress': 'প্রসেসিং হচ্ছে',
+                    'resolved': 'সমাধান হয়েছে',
+                    'rejected': 'প্রত্যাখ্যান হয়েছে'
+                };
+
+                const statusLabel = statusLabels[issue.status] || issue.status;
+                const notifType = issue.status === 'resolved' ? 'resolution'
+                    : issue.status === 'in-progress' ? 'issue_update'
+                        : 'issue_update';
+
+                notifications.push({
+                    id: `status_${issue.id}`,
+                    type: notifType,
+                    title: issue.status === 'resolved' ? 'সমাধান সম্পন্ন ✅' : 'ইস্যু আপডেট',
+                    message: `আপনার ইস্যু "${issue.title}" — স্ট্যাটাস: ${statusLabel}`,
+                    read: false,
+                    createdAt: issue.updatedAt,
+                    issueId: issue.id
+                });
+            }
+        }
+
+        // 2. Votes on user's issues
+        for (const issue of userIssues) {
+            const totalVotes = (issue.votesGood || 0) + (issue.votesBad || 0);
+            if (totalVotes > 0) {
+                notifications.push({
+                    id: `vote_${issue.id}`,
+                    type: 'vote',
+                    title: 'নতুন ভোট',
+                    message: `আপনার ইস্যু "${issue.title}" তে ${totalVotes} জন ভোট দিয়েছেন`,
+                    read: false,
+                    createdAt: issue.updatedAt || issue.createdAt,
+                    issueId: issue.id
+                });
+            }
+        }
+
+        // 3. Comments on user's issues
+        const issueIds = userIssues.map(i => i.id);
+        if (issueIds.length > 0) {
+            const recentComments = await db.select({
+                commentId: comments.id,
+                issueId: comments.issueId,
+                text: comments.text,
+                createdAt: comments.createdAt,
+                commenterName: users.name,
+                commenterId: comments.userId
+            })
+                .from(comments)
+                .leftJoin(users, eq(comments.userId, users.id))
+                .where(sql`${comments.issueId} IN (${sql.join(issueIds.map(id => sql`${id}`), sql`, `)})`)
+                .orderBy(desc(comments.createdAt))
+                .limit(10);
+
+            for (const comment of recentComments) {
+                // Don't notify for user's own comments
+                if (comment.commenterId === userId) continue;
+
+                const matchingIssue = userIssues.find(i => i.id === comment.issueId);
+                notifications.push({
+                    id: `comment_${comment.commentId}`,
+                    type: 'comment',
+                    title: 'নতুন কমেন্ট',
+                    message: `${comment.commenterName || 'কেউ'} আপনার ইস্যু "${matchingIssue?.title || ''}" তে কমেন্ট করেছেন`,
+                    read: false,
+                    createdAt: comment.createdAt,
+                    issueId: comment.issueId
+                });
+            }
+        }
+
+        // 4. Broadcast announcements
+        const announcements = await db.select({
+            id: messages.id,
+            subject: messages.subject,
+            message: messages.message,
+            createdAt: messages.createdAt
+        })
+            .from(messages)
+            .where(eq(messages.type, 'broadcast'))
+            .orderBy(desc(messages.createdAt))
+            .limit(3);
+
+        for (const a of announcements) {
+            notifications.push({
+                id: `announce_${a.id}`,
+                type: 'announcement',
+                title: a.subject || 'ঘোষণা',
+                message: a.message,
+                read: true, // announcements are informational
+                createdAt: a.createdAt,
+                issueId: null
+            });
+        }
+
+        // Sort by createdAt descending
+        notifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        // Return top 20 notifications
+        res.json(notifications.slice(0, 20));
+    } catch (err) {
+        console.error('Notifications error:', err);
+        res.status(500).json([]);
+    }
 });
 
 // Admin Stats
 app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
-    const total = await Issue.countDocuments();
-    const pending = await Issue.countDocuments({ status: 'pending' });
-    const inProgress = await Issue.countDocuments({ status: 'in-progress' });
-    const resolved = await Issue.countDocuments({ status: 'resolved' });
-    const criticalCount = await Issue.countDocuments({ priority: { $in: ['high', 'critical'] }, status: 'pending' });
+    try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayCount = await Issue.countDocuments({ createdAt: { $gte: today } });
+        // Run all count aggregations concurrently
+        const [
+            totalRes, pendingRes, inProgressRes, resolvedRes, criticalRes,
+            todayRes, weekRes, totalUsersRes, activeUsersRes
+        ] = await Promise.all([
+            db.select({ count: sql`count(*)` }).from(issues),
+            db.select({ count: sql`count(*)` }).from(issues).where(eq(issues.status, 'pending')),
+            db.select({ count: sql`count(*)` }).from(issues).where(eq(issues.status, 'in-progress')),
+            db.select({ count: sql`count(*)` }).from(issues).where(eq(issues.status, 'resolved')),
+            db.select({ count: sql`count(*)` }).from(issues).where(and(or(eq(issues.priority, 'high'), eq(issues.priority, 'critical')), eq(issues.status, 'pending'))),
+            db.select({ count: sql`count(*)` }).from(issues).where(sql`${issues.createdAt} >= ${today}`),
+            db.select({ count: sql`count(*)` }).from(issues).where(sql`${issues.createdAt} >= ${weekAgo}`),
+            db.select({ count: sql`count(*)` }).from(users).where(eq(users.role, 'user')),
+            db.select({ count: sql`count(*)` }).from(users).where(and(eq(users.role, 'user'), eq(users.isBlocked, false)))
+        ]);
 
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const weekCount = await Issue.countDocuments({ createdAt: { $gte: weekAgo } });
+        res.json({
+            total: Number(totalRes[0].count),
+            pending: Number(pendingRes[0].count),
+            inProgress: Number(inProgressRes[0].count),
+            resolved: Number(resolvedRes[0].count),
+            todayCount: Number(todayRes[0].count),
+            weekCount: Number(weekRes[0].count),
+            criticalCount: Number(criticalRes[0].count),
+            avgResolutionTime: 0,
+            totalUsers: Number(totalUsersRes[0].count),
+            activeUsers: Number(activeUsersRes[0].count)
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
+    }
+});
 
-    const totalUsers = await User.countDocuments({ role: 'user' });
-    const activeUsers = await User.countDocuments({ role: 'user', isBlocked: { $ne: true } });
-
-    res.json({
-        total,
-        pending,
-        inProgress,
-        resolved,
-        todayCount,
-        weekCount,
-        criticalCount,
-        avgResolutionTime: 0,
-        totalUsers,
-        activeUsers
-    });
+// Admin Issues (All records including pending)
+app.get('/api/admin/issues', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const issuesData = await db.select().from(issues).orderBy(desc(issues.createdAt));
+        const mappedIssues = issuesData.map(i => ({
+            ...i,
+            _id: i.id,
+            votes: i.votesGood - i.votesBad
+        }));
+        res.json(mappedIssues);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json([]);
+    }
 });
 
 // Admin Analytics
 app.get('/api/admin/analytics', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const days = parseInt(req.query.days) || 30;
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
 
-    const days = parseInt(req.query.days) || 30;
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+        // Optimized aggregation queries using Drizzle ORM native SQL formatting
+        const [categoryAgg, statusAgg, dailyStatsAgg, departmentAgg] = await Promise.all([
+            db.select({ _id: issues.category, count: sql`count(*)` }).from(issues).groupBy(issues.category),
+            db.select({ _id: issues.status, count: sql`count(*)` }).from(issues).groupBy(issues.status),
+            db.select({
+                _id: sql`to_char(${issues.createdAt}, 'MM/DD')`.as('_id'),
+                issues: sql`cast(count(*) as integer)`.as('issues'),
+                resolved: sql`cast(sum(case when ${issues.status} = 'resolved' then 1 else 0 end) as integer)`.as('resolved')
+            })
+                .from(issues)
+                .where(sql`${issues.createdAt} >= ${startDate}`)
+                .groupBy(sql`to_char(${issues.createdAt}, 'MM/DD')`)
+                .orderBy(sql`to_char(${issues.createdAt}, 'MM/DD')`),
+            db.select({
+                department: sql`coalesce(${users.department}, 'Unknown')`.as('department'),
+                total: sql`cast(count(*) as integer)`.as('total'),
+                resolved: sql`cast(sum(case when ${issues.status} = 'resolved' then 1 else 0 end) as integer)`.as('resolved'),
+                pending: sql`cast(sum(case when ${issues.status} = 'pending' then 1 else 0 end) as integer)`.as('pending')
+            })
+                .from(issues)
+                .leftJoin(users, eq(issues.submittedBy, users.id))
+                .groupBy(sql`coalesce(${users.department}, 'Unknown')`)
+        ]);
 
-    // Issues by category
-    const categoryAgg = await Issue.aggregate([
-        { $group: { _id: '$category', count: { $sum: 1 } } }
-    ]);
-    const issuesByCategory = categoryAgg.map(item => ({
-        name: item._id || 'Other',
-        value: item.count
-    }));
-
-    // Issues by status
-    const statusAgg = await Issue.aggregate([
-        { $group: { _id: '$status', count: { $sum: 1 } } }
-    ]);
-    const issuesByStatus = statusAgg.map(item => ({
-        name: item._id,
-        value: item.count
-    }));
-
-    // Trend data - issues per day
-    const trendData = [];
-    for (let i = days - 1; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        date.setHours(0, 0, 0, 0);
-        const nextDate = new Date(date);
-        nextDate.setDate(nextDate.getDate() + 1);
-
-        const totalIssues = await Issue.countDocuments({
-            createdAt: { $gte: date, $lt: nextDate }
+        res.json({
+            issuesByCategory: categoryAgg.map(item => ({ name: item._id || 'Other', value: Number(item.count) })),
+            issuesByStatus: statusAgg.map(item => ({ name: item._id, value: Number(item.count) })),
+            trendData: dailyStatsAgg.map(item => ({ date: item._id, issues: item.issues, resolved: item.resolved })),
+            departmentStats: departmentAgg.filter(d => d.total > 0)
         });
-        const resolved = await Issue.countDocuments({
-            createdAt: { $gte: date, $lt: nextDate },
-            status: 'resolved'
-        });
-
-        trendData.push({
-            date: `${date.getMonth() + 1}/${date.getDate()}`,
-            issues: totalIssues,
-            resolved: resolved
-        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
     }
-
-    // Department stats - get issues for each department from submittedBy user
-    const users = await User.find({}, 'department');
-    const deptMap = {};
-
-    for (const user of users) {
-        const dept = user.department || 'Unknown';
-        if (!deptMap[dept]) {
-            deptMap[dept] = { department: dept, total: 0, resolved: 0, pending: 0 };
-        }
-
-        const totalIssues = await Issue.countDocuments({ submittedBy: user._id });
-        const resolvedIssues = await Issue.countDocuments({ submittedBy: user._id, status: 'resolved' });
-        const pendingIssues = await Issue.countDocuments({ submittedBy: user._id, status: 'pending' });
-
-        deptMap[dept].total += totalIssues;
-        deptMap[dept].resolved += resolvedIssues;
-        deptMap[dept].pending += pendingIssues;
-    }
-
-    const departmentStats = Object.values(deptMap).filter(d => d.total > 0);
-
-    res.json({
-        issuesByCategory,
-        issuesByStatus,
-        trendData,
-        departmentStats
-    });
 });
 
 // Admin System Configuration
 app.get('/api/admin/system-config', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
-    let config = await SystemConfig.findOne();
-    if (!config) {
-        // Create default config if none exists
-        config = await SystemConfig.create({
-            categories: ['Academic', 'Infrastructure', 'Canteen', 'Library', 'Transport', 'Other'],
-            priorities: ['low', 'medium', 'high', 'critical'],
-            maintenanceMode: false,
-            allowRegistration: true,
-            slaRules: {
-                criticalResponseTime: 2,
-                highResponseTime: 24,
-                mediumResponseTime: 48
-            }
-        });
+        let config = await db.select().from(systemConfig).limit(1).then(r => r[0]);
+        if (!config) {
+            // Create default config if none exists
+            const [newConfig] = await db.insert(systemConfig).values({
+                categories: ['Academic', 'Infrastructure', 'Canteen', 'Library', 'Transport', 'Other'],
+                priorities: ['low', 'medium', 'high', 'critical'],
+                maintenanceMode: false,
+                allowRegistration: true,
+                slaRules: {
+                    criticalResponseTime: 2,
+                    highResponseTime: 24,
+                    mediumResponseTime: 48
+                }
+            }).returning();
+            config = newConfig;
+        }
+        res.json(config);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
     }
-    res.json(config);
 });
 
 app.post('/api/admin/system-config', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
-    let config = await SystemConfig.findOne();
-    if (config) {
-        Object.assign(config, req.body);
-        await config.save();
-    } else {
-        config = await SystemConfig.create(req.body);
+        let config = await db.select().from(systemConfig).limit(1).then(r => r[0]);
+        if (config) {
+            const updateProps = { ...req.body };
+            delete updateProps._id; // sanitize
+            delete updateProps.id;
+
+            const [updatedConfig] = await db.update(systemConfig)
+                .set(updateProps)
+                .where(eq(systemConfig.id, config.id))
+                .returning();
+            config = updatedConfig;
+        } else {
+            const [newConfig] = await db.insert(systemConfig).values(req.body).returning();
+            config = newConfig;
+        }
+
+        // Log audit
+        await db.insert(auditLogs).values({
+            adminId: req.user.id,
+            targetId: config.id,
+            targetType: 'system',
+            action: 'update_config',
+            details: 'System configuration updated',
+            ip: req.ip
+        });
+
+        res.json({ message: 'Configuration saved', config });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
     }
-
-    // Log audit
-    await AuditLog.create({
-        adminId: req.user.id,
-        targetId: config._id,
-        targetType: 'system',
-        action: 'update_config',
-        details: 'System configuration updated',
-        ip: req.ip
-    });
-
-    res.json({ message: 'Configuration saved', config });
 });
 
 // Admin Activity Feed
 app.get('/api/admin/activity', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const recentIssues = await db.select({
+            id: issues.id,
+            title: issues.title,
+            priority: issues.priority,
+            createdAt: issues.createdAt,
+            submitterName: users.name
+        })
+            .from(issues)
+            .leftJoin(users, eq(issues.submittedBy, users.id))
+            .orderBy(desc(issues.createdAt))
+            .limit(10);
 
-    const recentIssues = await Issue.find().sort({ createdAt: -1 }).limit(10).populate('submittedBy', 'name');
+        const activities = recentIssues.map(issue => ({
+            id: issue.id,
+            type: 'new_issue',
+            title: 'New Issue Submitted',
+            description: `${issue.title} (${issue.priority})`,
+            user: issue.submitterName || 'Anonymous',
+            timestamp: issue.createdAt
+        }));
 
-    const activities = recentIssues.map(issue => ({
-        id: issue._id,
-        type: 'new_issue',
-        title: 'New Issue Submitted',
-        description: `${issue.title} (${issue.priority})`,
-        user: issue.submittedBy ? issue.submittedBy.name : 'Anonymous',
-        timestamp: issue.createdAt
-    }));
-
-    res.json(activities);
+        res.json(activities);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json([]);
+    }
 });
 
 // Admin Audit Logs
 app.get('/api/admin/audit-logs', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
-    const logs = await AuditLog.find()
-        .sort({ timestamp: -1 })
-        .limit(100)
-        .populate('adminId', 'name email');
+        const logs = await db.select({
+            _id: auditLogs.id,
+            action: auditLogs.action,
+            details: auditLogs.details,
+            targetId: auditLogs.targetId,
+            targetType: auditLogs.targetType,
+            ip: auditLogs.ip,
+            timestamp: auditLogs.timestamp,
+            adminId: { name: users.name, email: users.email }
+        })
+            .from(auditLogs)
+            .leftJoin(users, eq(auditLogs.adminId, users.id))
+            .orderBy(desc(auditLogs.timestamp))
+            .limit(100);
 
-    res.json(logs);
+        res.json(logs);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json([]);
+    }
 });
 
 // Admin User Management
 app.get('/api/admin/users', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
-    // Fetch users with their issue counts
-    const users = await User.find().select('-password').sort({ createdAt: -1 });
-    const usersWithCounts = await Promise.all(users.map(async (u) => {
-        const count = await Issue.countDocuments({ submittedBy: u._id });
-        return { ...u.toObject(), issueCount: count };
-    }));
+        const usersList = await db.select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            role: users.role,
+            department: users.department,
+            roll: users.roll,
+            isBlocked: users.isBlocked,
+            createdAt: users.createdAt,
+            issueCount: sql`cast(count(${issues.id}) as integer)`
+        })
+            .from(users)
+            .leftJoin(issues, eq(issues.submittedBy, users.id))
+            .groupBy(users.id)
+            .orderBy(desc(users.createdAt));
 
-    res.json(usersWithCounts);
+        const formatted = usersList.map(u => ({ ...u, _id: u.id }));
+        res.json(formatted);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json([]);
+    }
+});
+
+// Admin Staff Management
+app.get('/api/admin/staff', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin' && req.user.role !== 'super_admin') return res.status(403).json({ message: 'Admin only' });
+
+        const staffList = await db.select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            role: users.role,
+            department: users.department,
+            assignedIssues: sql`cast(count(case when ${issues.status} != 'Resolved' and ${issues.status} != 'Closed' and ${issues.assignedTo} = ${users.id} then 1 else null end) as integer)`,
+            resolvedIssues: sql`cast(count(case when (${issues.status} = 'Resolved' or ${issues.status} = 'Closed') and ${issues.assignedTo} = ${users.id} then 1 else null end) as integer)`
+        })
+            .from(users)
+            .leftJoin(issues, eq(issues.assignedTo, users.id))
+            .where(or(
+                eq(users.role, 'admin'),
+                eq(users.role, 'super_admin'),
+                eq(users.role, 'dept_head'),
+                eq(users.role, 'staff'),
+                eq(users.role, 'viewer')
+            ))
+            .groupBy(users.id)
+            .orderBy(desc(users.createdAt));
+
+        const formatted = staffList.map(s => ({
+            ...s,
+            status: 'available' // Mock availability status for now
+        }));
+
+        res.json(formatted);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json([]);
+    }
+});
+
+app.post('/api/admin/staff', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+            return res.status(403).json({ message: 'Admin only access' });
+        }
+
+        const { name, email, password, role, department } = req.body;
+
+        const existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
+        if (existingUser) {
+            return res.status(400).json({ message: 'Email already exists' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        await db.insert(users).values({
+            name,
+            email,
+            password: hashedPassword,
+            role: role || 'staff',
+            department: department || 'General'
+        });
+
+        res.status(201).json({ message: 'Staff member created successfully' });
+    } catch (error) {
+        console.error('Error creating staff:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
 });
 
 app.patch('/api/admin/users/:id/block', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+        const user = await db.select().from(users).where(eq(users.id, req.params.id)).limit(1).then(r => r[0]);
+        if (!user) return res.status(404).json({ message: 'User not found' });
 
-    user.isBlocked = !user.isBlocked;
-    // If blocking, maybe revoke tokens? (Not implemented here, but good for future)
-    await user.save();
+        const newBlockedStatus = !user.isBlocked;
+        await db.update(users).set({ isBlocked: newBlockedStatus }).where(eq(users.id, user.id));
 
-    // Log audit
-    await AuditLog.create({
-        adminId: req.user.id,
-        targetId: user._id,
-        targetType: 'user',
-        action: user.isBlocked ? 'block_user' : 'unblock_user',
-        details: `User ${user.email} was ${user.isBlocked ? 'blocked' : 'unblocked'}`,
-        ip: req.ip
-    });
+        // Log audit
+        await db.insert(auditLogs).values({
+            adminId: req.user.id,
+            targetId: user.id,
+            targetType: 'user',
+            action: newBlockedStatus ? 'block_user' : 'unblock_user',
+            details: `User ${user.email} was ${newBlockedStatus ? 'blocked' : 'unblocked'}`,
+            ip: req.ip
+        });
 
-    res.json({ message: `User ${user.isBlocked ? 'blocked' : 'active'}` });
+        res.json({ message: `User ${newBlockedStatus ? 'blocked' : 'active'}` });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
+    }
 });
 
 app.post('/api/admin/users/:id/reset-password', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+        const user = await db.select().from(users).where(eq(users.id, req.params.id)).limit(1).then(r => r[0]);
+        if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const defaultPass = "123456";
-    user.password = await bcrypt.hash(defaultPass, SALT_ROUNDS);
-    await user.save();
+        const defaultPass = "123456";
+        const hashedPassword = await bcrypt.hash(defaultPass, 8);
+        await db.update(users).set({ password: hashedPassword }).where(eq(users.id, user.id));
 
-    // Log audit
-    await AuditLog.create({
-        adminId: req.user.id,
-        targetId: user._id,
-        targetType: 'user',
-        action: 'reset_password',
-        details: `Password reset for ${user.email}`,
-        ip: req.ip
-    });
+        // Log audit
+        await db.insert(auditLogs).values({
+            adminId: req.user.id,
+            targetId: user.id,
+            targetType: 'user',
+            action: 'reset_password',
+            details: `Password reset for ${user.email}`,
+            ip: req.ip
+        });
 
-    res.json({ message: 'Password reset successful' });
+        res.json({ message: 'Password reset successful' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
+    }
 });
 
 // Get specific user statistics (for admin)
 app.get('/api/admin/users/:id/stats', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
-    const userId = req.params.id;
+        const userId = req.params.id;
 
-    const total = await Issue.countDocuments({ submittedBy: userId });
-    const pending = await Issue.countDocuments({ submittedBy: userId, status: 'pending' });
-    const inProgress = await Issue.countDocuments({ submittedBy: userId, status: 'in-progress' });
-    const resolved = await Issue.countDocuments({ submittedBy: userId, status: 'resolved' });
+        const [totalRes, pendingRes, inProgressRes, resolvedRes, categoryAgg] = await Promise.all([
+            db.select({ count: sql`count(*)` }).from(issues).where(eq(issues.submittedBy, userId)),
+            db.select({ count: sql`count(*)` }).from(issues).where(and(eq(issues.submittedBy, userId), eq(issues.status, 'pending'))),
+            db.select({ count: sql`count(*)` }).from(issues).where(and(eq(issues.submittedBy, userId), eq(issues.status, 'in-progress'))),
+            db.select({ count: sql`count(*)` }).from(issues).where(and(eq(issues.submittedBy, userId), eq(issues.status, 'resolved'))),
+            db.select({ _id: issues.category, count: sql`count(*)` }).from(issues).where(eq(issues.submittedBy, userId)).groupBy(issues.category)
+        ]);
 
-    // Category breakdown
-    const categoryAgg = await Issue.aggregate([
-        { $match: { submittedBy: mongoose.Types.ObjectId(userId) } }, { $group: { _id: '$category', count: { $sum: 1 } } }
-    ]);
+        const categoryBreakdown = categoryAgg.map(item => ({
+            category: item._id || 'Other',
+            count: Number(item.count)
+        }));
 
-    const categoryBreakdown = categoryAgg.map(item => ({
-        category: item._id || 'Other',
-        count: item.count
-    }));
-
-    res.json({
-        total,
-        pending,
-        inProgress,
-        resolved,
-        categoryBreakdown
-    });
+        res.json({
+            total: Number(totalRes[0].count),
+            pending: Number(pendingRes[0].count),
+            inProgress: Number(inProgressRes[0].count),
+            resolved: Number(resolvedRes[0].count),
+            categoryBreakdown
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
+    }
 });
 
 // Communication Center
 app.get('/api/messages', authenticateToken, async (req, res) => {
     try {
-        const messages = await Message.find({
-            $or: [
-                { to: req.user.id },           // Messages sent to me
-                { from: req.user.id },         // Messages I sent
-                { type: 'broadcast' }          // Broadcast messages
-            ]
+        const msgs = await db.select({
+            _id: messages.id,
+            subject: messages.subject,
+            message: messages.message,
+            type: messages.type,
+            createdAt: messages.createdAt,
+            from: { _id: users.id, name: users.name, email: users.email, roll: users.roll }
         })
-            .sort({ createdAt: -1 })
-            .populate('from', 'name email roll')
-            .populate('to', 'name email roll');
+            .from(messages)
+            .leftJoin(users, eq(messages.from, users.id))
+            .where(
+                or(
+                    eq(messages.to, req.user.id),
+                    eq(messages.from, req.user.id),
+                    eq(messages.type, 'broadcast')
+                )
+            )
+            .orderBy(desc(messages.createdAt));
 
-        res.json(messages);
+        res.json(msgs);
     } catch (error) {
         console.error('Error fetching messages:', error);
         res.status(500).json({ message: 'Failed to fetch messages' });
@@ -925,14 +1495,14 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
 
         // If 'to' is a roll number (string), look up the user
         if (req.body.toRoll) {
-            const recipient = await User.findOne({ roll: req.body.toRoll });
+            const recipient = await db.select().from(users).where(eq(users.roll, req.body.toRoll)).limit(1).then(r => r[0]);
             if (!recipient) {
                 return res.status(404).json({ message: `User with roll ${req.body.toRoll} not found` });
             }
-            recipientId = recipient._id;
+            recipientId = recipient.id;
         }
 
-        const message = await Message.create({
+        const [message] = await db.insert(messages).values({
             from: req.user.id,
             to: recipientId,
             subject: req.body.subject,
@@ -980,22 +1550,24 @@ app.post('/api/admin/send-bulk-email', authenticateToken, async (req, res) => {
             }
         } else {
             // Get target users based on recipients filter
-            let query = {};
+            let userQuery = req.user.role === 'user' ? 'user' : 'user'; // Assume default targeting 'user' role
             if (recipients === 'students') {
-                query = { role: 'user' }; // Assuming students have role 'user'
+                userQuery = 'user'; // Assuming students have role 'user'
             }
 
-            const users = await User.find(query).select('email name');
+            const targetUsers = await db.select({ email: users.email, name: users.name })
+                .from(users)
+                .where(eq(users.role, userQuery));
 
-            if (users.length === 0) {
+            if (targetUsers.length === 0) {
                 return res.status(400).json({ message: 'No users found' });
             }
 
-            emailAddresses = users.map(u => u.email);
+            emailAddresses = targetUsers.map(u => u.email);
         }
 
         // Store broadcast message in database
-        await Message.create({
+        await db.insert(messages).values({
             from: req.user.id,
             subject: subject,
             message: body,
@@ -1005,7 +1577,6 @@ app.post('/api/admin/send-bulk-email', authenticateToken, async (req, res) => {
         });
 
         // Send emails to all users (async, don't block response)
-
         sendBulkEmails(
             emailAddresses,
             emailTemplates.bulkEmail,
@@ -1029,70 +1600,127 @@ app.post('/api/admin/send-bulk-email', authenticateToken, async (req, res) => {
     }
 });
 
+app.get('/api/user/issues', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const userIssues = await db.select().from(issues).where(eq(issues.submittedBy, userId)).orderBy(desc(issues.createdAt));
+        const mappedIssues = userIssues.map(i => ({ ...i, _id: i.id, votes: i.votesGood - i.votesBad }));
+        res.json(mappedIssues);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json([]);
+    }
+});
+
+app.get('/api/issues/:id', authenticateToken, async (req, res) => {
+    try {
+        const issueId = req.params.id;
+        const [issue] = await db.select().from(issues).where(eq(issues.id, issueId));
+
+        if (!issue) {
+            return res.status(404).json({ message: 'Issue not found' });
+        }
+
+        const mappedIssue = { ...issue, _id: issue.id, votes: issue.votesGood - issue.votesBad };
+        res.json(mappedIssue);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server Error' });
+    }
+});
+
 // Knowledge Base Management
 app.get('/api/admin/knowledge-base', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
-    const articles = await Article.find().sort({ createdAt: -1 });
-    res.json(articles);
+        const articlesList = await db.select().from(articles).orderBy(desc(articles.createdAt));
+        const mappedArticles = articlesList.map(a => ({ ...a, _id: a.id }));
+
+        res.json(mappedArticles);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json([]);
+    }
 });
 
 app.post('/api/admin/knowledge-base', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
-    const article = await Article.create(req.body);
+        const [article] = await db.insert(articles).values(req.body).returning();
 
-    await AuditLog.create({
-        adminId: req.user.id,
-        targetId: article._id,
-        targetType: 'knowledge_base',
-        action: 'create_article',
-        details: `Article created: ${article.title}`,
-        ip: req.ip
-    });
+        await db.insert(auditLogs).values({
+            adminId: req.user.id,
+            targetId: article.id,
+            targetType: 'knowledge_base',
+            action: 'create_article',
+            details: `Article created: ${article.title}`,
+            ip: req.ip
+        });
 
-    res.status(201).json(article);
+        article._id = article.id;
+        res.status(201).json(article);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
+    }
 });
 
 app.put('/api/admin/knowledge-base/:id', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
-    const article = await Article.findByIdAndUpdate(
-        req.params.id,
-        { ...req.body, updatedAt: new Date() },
-        { new: true }
-    );
+        const updateData = { ...req.body, updatedAt: new Date() };
+        delete updateData._id;
+        if (updateData.id) delete updateData.id;
 
-    if (!article) return res.status(404).json({ message: 'Article not found' });
+        const [article] = await db.update(articles)
+            .set(updateData)
+            .where(eq(articles.id, req.params.id))
+            .returning();
 
-    await AuditLog.create({
-        adminId: req.user.id,
-        targetId: article._id,
-        targetType: 'knowledge_base',
-        action: 'update_article',
-        details: `Article updated: ${article.title}`,
-        ip: req.ip
-    });
+        if (!article) return res.status(404).json({ message: 'Article not found' });
 
-    res.json(article);
+        await db.insert(auditLogs).values({
+            adminId: req.user.id,
+            targetId: article.id,
+            targetType: 'knowledge_base',
+            action: 'update_article',
+            details: `Article updated: ${article.title}`,
+            ip: req.ip
+        });
+
+        article._id = article.id;
+        res.json(article);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
+    }
 });
 
 app.delete('/api/admin/knowledge-base/:id', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
+    try {
+        if (req.user.role !== 'admin') return res.status(403).json({ message: 'Admin only' });
 
-    const article = await Article.findByIdAndDelete(req.params.id);
-    if (!article) return res.status(404).json({ message: 'Article not found' });
+        const [article] = await db.delete(articles).where(eq(articles.id, req.params.id)).returning();
 
-    await AuditLog.create({
-        adminId: req.user.id,
-        targetId: article._id,
-        targetType: 'knowledge_base',
-        action: 'delete_article',
-        details: `Article deleted: ${article.title}`,
-        ip: req.ip
-    });
+        if (!article) return res.status(404).json({ message: 'Article not found' });
 
-    res.json({ message: 'Article deleted' });
+        await db.insert(auditLogs).values({
+            adminId: req.user.id,
+            targetId: article.id,
+            targetType: 'knowledge_base',
+            action: 'delete_article',
+            details: `Article deleted: ${article.title}`,
+            ip: req.ip
+        });
+
+        res.json({ message: 'Article deleted' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server Error" });
+    }
 });
 
 const upload = multer();
@@ -1102,5 +1730,186 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
         message: 'Mock upload successful'
     });
 });
+
+
+// ★ ADMIN: Get all users for user selector
+app.get('/api/admin/all-users', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const allUsers = await db.select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            department: users.department,
+            roll: users.roll,
+            role: users.role
+        }).from(users).orderBy(users.name);
+        res.json(allUsers);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json([]);
+    }
+});
+
+// ★ ADMIN: Send custom email
+app.post('/api/admin/send-email', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { recipients, subject, body, manualEmails } = req.body;
+        // recipients: array of user IDs
+        // manualEmails: array of manual email strings
+
+        if (!subject || !body) {
+            return res.status(400).json({ message: 'Subject and body are required' });
+        }
+
+        const emailList = [];
+
+        // Get emails from selected user IDs
+        if (recipients && recipients.length > 0) {
+            for (const userId of recipients) {
+                const user = await db.select({ email: users.email, name: users.name })
+                    .from(users).where(eq(users.id, userId)).limit(1).then(r => r[0]);
+                if (user && user.email) emailList.push(user.email);
+            }
+        }
+
+        // Add manual emails
+        if (manualEmails && manualEmails.length > 0) {
+            emailList.push(...manualEmails.filter(e => e && e.includes('@')));
+        }
+
+        if (emailList.length === 0) {
+            return res.status(400).json({ message: 'No recipients specified' });
+        }
+
+        // Remove duplicates
+        const uniqueEmails = [...new Set(emailList)];
+
+        // Send emails using the bulk email template
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const email of uniqueEmails) {
+            try {
+                await sendEmail(email, 'bulkEmail', { subject, body });
+                successCount++;
+            } catch (err) {
+                console.error(`Failed to send to ${email}:`, err.message);
+                failCount++;
+            }
+        }
+
+        // Audit log
+        await db.insert(auditLogs).values({
+            adminId: req.user.id,
+            targetId: null,
+            targetType: 'email',
+            action: 'send_bulk_email',
+            details: `Sent email "${subject}" to ${successCount} recipients (${failCount} failed)`,
+            ip: req.ip
+        });
+
+        res.json({
+            message: `Email sent to ${successCount} recipients`,
+            success: successCount,
+            failed: failCount,
+            total: uniqueEmails.length
+        });
+    } catch (err) {
+        console.error('Send email error:', err);
+        res.status(500).json({ message: 'Failed to send emails' });
+    }
+});
+
+// ★ ADMIN: Send custom push notification
+app.post('/api/admin/send-push', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { recipients, title, body, url } = req.body;
+        // recipients: array of user IDs, or 'all' for all users
+
+        if (!title || !body) {
+            return res.status(400).json({ message: 'Title and body are required' });
+        }
+
+        let targetUserIds = [];
+
+        if (recipients === 'all' || (Array.isArray(recipients) && recipients.includes('all'))) {
+            // Send to all users
+            const allUsers = await db.select({ id: users.id }).from(users);
+            targetUserIds = allUsers.map(u => u.id);
+        } else if (Array.isArray(recipients) && recipients.length > 0) {
+            targetUserIds = recipients;
+        } else {
+            return res.status(400).json({ message: 'No recipients specified' });
+        }
+
+        let successCount = 0;
+        for (const userId of targetUserIds) {
+            try {
+                await sendPushToUser(userId, { title, body, url: url || '/user/dashboard' });
+                successCount++;
+            } catch (e) {
+                // Ignore individual failures
+            }
+        }
+
+        // Audit log
+        await db.insert(auditLogs).values({
+            adminId: req.user.id,
+            targetId: null,
+            targetType: 'push_notification',
+            action: 'send_push',
+            details: `Sent push "${title}" to ${successCount} users`,
+            ip: req.ip
+        });
+
+        res.json({
+            message: `Push notification sent to ${successCount} users`,
+            success: successCount,
+            total: targetUserIds.length
+        });
+    } catch (err) {
+        console.error('Send push error:', err);
+        res.status(500).json({ message: 'Failed to send push notifications' });
+    }
+});
+
+// ★ USER: Subscribe to Push Notifications
+app.post('/api/user/subscribe-push', authenticateToken, async (req, res) => {
+    try {
+        const { subscription } = req.body;
+        if (!subscription || !subscription.endpoint) {
+            return res.status(400).json({ message: 'Invalid subscription object' });
+        }
+
+        const userId = req.user.id;
+
+        // Check if existing endpoint already saved for this user
+        const existing = await db.select().from(pushSubscriptions)
+            .where(eq(pushSubscriptions.endpoint, subscription.endpoint))
+            .limit(1).then(r => r[0]);
+
+        if (existing) {
+            // Already subscribed on this device
+            return res.json({ message: 'Already subscribed' });
+        }
+
+        // Save new subscription
+        await db.insert(pushSubscriptions).values({
+            userId,
+            endpoint: subscription.endpoint,
+            keys: subscription.keys
+        });
+
+        res.json({ message: 'Push subscription saved successfully' });
+    } catch (err) {
+        console.error('Push subscription error:', err);
+        res.status(500).json({ message: 'Failed to subscribe to push notifications' });
+    }
+});
+
+if (require.main === module) {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
 
 module.exports = app;

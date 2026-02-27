@@ -1,66 +1,86 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
+import api from '@/services/api';
 import NotificationDropdown from './NotificationDropdown';
 
 export interface Notification {
     id: string;
-    type: 'issue_update' | 'comment' | 'vote' | 'resolution';
+    type: 'issue_update' | 'comment' | 'vote' | 'resolution' | 'announcement';
     title: string;
     message: string;
     read: boolean;
-    createdAt: Date;
-    issueId?: string;
+    createdAt: Date | string;
+    issueId?: string | null;
 }
 
 const NotificationBell = () => {
     const [isOpen, setIsOpen] = useState(false);
-    const [notifications, setNotifications] = useState<Notification[]>([
-        // Demo notifications - Replace with real data from API
-        {
-            id: '1',
-            type: 'issue_update',
-            title: 'ইস্যু আপডেট',
-            message: 'আপনার ইস্যু "Library AC Problem" এর স্ট্যাটাস আপডেট হয়েছে',
-            read: false,
-            createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-            issueId: '123'
+    // Track read/deleted notifications in localStorage
+    const [readIds, setReadIds] = useState<Set<string>>(() => {
+        try {
+            const saved = localStorage.getItem('notif_read_ids');
+            return saved ? new Set(JSON.parse(saved)) : new Set();
+        } catch { return new Set(); }
+    });
+    const [deletedIds, setDeletedIds] = useState<Set<string>>(() => {
+        try {
+            const saved = localStorage.getItem('notif_deleted_ids');
+            return saved ? new Set(JSON.parse(saved)) : new Set();
+        } catch { return new Set(); }
+    });
+
+    // ★ REAL NOTIFICATIONS — fetched from backend API with real-time polling
+    const { data: rawNotifications = [] } = useQuery<Notification[]>({
+        queryKey: ['user-notifications'],
+        queryFn: async () => {
+            const { data } = await api.get('/user/notifications');
+            return data;
         },
-        {
-            id: '2',
-            type: 'vote',
-            title: 'নতুন ভোট',
-            message: '৫ জন আপনার ইস্যুতে ভোট দিয়েছেন',
-            read: false,
-            createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
-            issueId: '123'
-        },
-        {
-            id: '3',
-            type: 'resolution',
-            title: 'সমাধান সম্পন্ন',
-            message: 'আপনার ইস্যু "Canteen Food Quality" সমাধান করা হয়েছে',
-            read: true,
-            createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-            issueId: '124'
-        },
-    ]);
+        staleTime: 15000,          // Fresh for 15s
+        gcTime: 600000,            // Cache 10 min
+        refetchInterval: 10000,    // Real-time: poll every 10s
+        refetchIntervalInBackground: false,
+        placeholderData: (prev) => prev ?? [],
+    });
+
+    // Apply local read/deleted state to API data
+    const notifications = rawNotifications
+        .filter(n => !deletedIds.has(n.id))
+        .map(n => ({
+            ...n,
+            read: n.read || readIds.has(n.id),
+        }));
 
     const unreadCount = notifications.filter(n => !n.read).length;
 
-    const markAsRead = (id: string) => {
-        setNotifications(prev =>
-            prev.map(n => n.id === id ? { ...n, read: true } : n)
-        );
-    };
+    const markAsRead = useCallback((id: string) => {
+        setReadIds(prev => {
+            const next = new Set(prev);
+            next.add(id);
+            localStorage.setItem('notif_read_ids', JSON.stringify([...next]));
+            return next;
+        });
+    }, []);
 
-    const markAllAsRead = () => {
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    };
+    const markAllAsRead = useCallback(() => {
+        setReadIds(prev => {
+            const next = new Set(prev);
+            notifications.forEach(n => next.add(n.id));
+            localStorage.setItem('notif_read_ids', JSON.stringify([...next]));
+            return next;
+        });
+    }, [notifications]);
 
-    const deleteNotification = (id: string) => {
-        setNotifications(prev => prev.filter(n => n.id !== id));
-    };
+    const deleteNotification = useCallback((id: string) => {
+        setDeletedIds(prev => {
+            const next = new Set(prev);
+            next.add(id);
+            localStorage.setItem('notif_deleted_ids', JSON.stringify([...next]));
+            return next;
+        });
+    }, []);
 
     return (
         <div className="relative">

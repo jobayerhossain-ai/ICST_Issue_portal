@@ -44,45 +44,86 @@ const SLIDES = [
 
 const AUTOPLAY_MS = 4800;
 
-/* 🚀 Premium lag-free slide animation with GPU acceleration */
+/* ========================================================================
+   PERFORMANCE-FIRST ANIMATIONS
+   - Mobile: NO filter/blur animations — only transform + opacity (GPU-only)
+   - Desktop: Full premium blur transitions
+   ======================================================================== */
+
+// Detect mobile once at module level to avoid re-checks
+const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
 const getSlideVariant = (direction: number) => ({
   initial: {
-    x: direction > 0 ? "100%" : "-100%", // Enter from right if forward, left if backward
+    x: direction > 0 ? "100%" : "-100%",
     opacity: 0,
-    scale: 0.95,
-    filter: "blur(8px)",
+    scale: isMobile ? 1 : 1.05,
+    // NO filter on mobile — saves massive GPU cycles
+    ...(isMobile ? {} : { filter: "blur(8px)" }),
   },
   animate: {
     x: "0%",
     opacity: 1,
     scale: 1,
-    filter: "blur(0px)",
+    ...(isMobile ? {} : { filter: "blur(0px)" }),
     transition: {
-      duration: 0.5,
-      ease: [0.22, 1, 0.36, 1] as const, // Premium easing curve (easeOutExpo)
-      opacity: { duration: 0.3, ease: "easeOut" },
-      scale: { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const },
-      filter: { duration: 0.35 },
+      x: {
+        type: "spring",
+        stiffness: isMobile ? 300 : 180,  // Snappier on mobile
+        damping: isMobile ? 30 : 24,
+        mass: isMobile ? 0.8 : 1.2,
+        restDelta: 0.001,
+      } as const,
+      opacity: { duration: isMobile ? 0.2 : 0.4, ease: "easeOut" },
+      scale: { duration: isMobile ? 0.2 : 0.4, ease: "easeOut" },
+      ...(isMobile ? {} : { filter: { duration: 0.4 } }),
+      staggerChildren: isMobile ? 0.04 : 0.08,
+      delayChildren: isMobile ? 0.05 : 0.1,
     },
   },
   exit: {
-    x: direction > 0 ? "-100%" : "100%", // Exit to left if forward, right if backward
+    x: direction > 0 ? "-30%" : "30%",
     opacity: 0,
-    scale: 0.95,
-    filter: "blur(8px)",
+    scale: isMobile ? 1 : 0.95,
+    ...(isMobile ? {} : { filter: "blur(4px)" }),
     transition: {
-      duration: 0.4,
-      ease: [0.64, 0, 0.78, 0] as const, // Premium easeInExpo
-      opacity: { duration: 0.2, ease: "easeIn" },
-      scale: { duration: 0.35, ease: [0.64, 0, 0.78, 0] as const },
-      filter: { duration: 0.3 },
+      x: { type: "spring", stiffness: 300, damping: 30 } as const,
+      opacity: { duration: isMobile ? 0.15 : 0.3 },
+      scale: { duration: isMobile ? 0.15 : 0.3 },
+      ...(isMobile ? {} : { filter: { duration: 0.3 } }),
     },
   },
 });
 
+const contentVariants = {
+  initial: {
+    opacity: 0,
+    y: isMobile ? 15 : 30,
+    // NO filter on mobile
+    ...(isMobile ? {} : { filter: "blur(4px)" }),
+  },
+  animate: {
+    opacity: 1,
+    y: 0,
+    ...(isMobile ? {} : { filter: "blur(0px)" }),
+    transition: {
+      type: "spring" as const,
+      stiffness: isMobile ? 250 : 150,
+      damping: isMobile ? 25 : 20,
+      mass: isMobile ? 0.6 : 1,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -10,
+    ...(isMobile ? {} : { filter: "blur(4px)" }),
+    transition: { duration: isMobile ? 0.1 : 0.2 },
+  },
+};
+
 export default function HeroSection(): JSX.Element {
   const [idx, setIdx] = useState(0);
-  const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
+  const [direction, setDirection] = useState(1);
   const slidesCount = SLIDES.length;
 
   const [totalIssues, setTotalIssues] = useState<number | null>(null);
@@ -114,7 +155,7 @@ export default function HeroSection(): JSX.Element {
     if (autoplayTimer.current) window.clearTimeout(autoplayTimer.current);
     autoplayTimer.current = window.setTimeout(() => {
       if (!isPaused.current && !isDragging.current) {
-        setDirection(1); // Always forward for autoplay
+        setDirection(1);
         setIdx((s) => (s + 1) % slidesCount);
       }
     }, AUTOPLAY_MS);
@@ -186,10 +227,10 @@ export default function HeroSection(): JSX.Element {
 
     if (Math.abs(velocity) > 700) {
       if (velocity < 0) {
-        setDirection(1); // Swiped left = go forward
+        setDirection(1);
         setIdx((s) => (s + 1) % slidesCount);
       } else {
-        setDirection(-1); // Swiped right = go backward
+        setDirection(-1);
         setIdx((s) => (s - 1 + slidesCount) % slidesCount);
       }
     } else {
@@ -210,59 +251,37 @@ export default function HeroSection(): JSX.Element {
   return (
     <section
       ref={containerRef}
-      className="relative min-h-[520px] md:min-h-[700px] overflow-hidden"
+      className="relative min-h-[520px] md:min-h-[700px] overflow-hidden flex flex-col justify-center"
       aria-roledescription="carousel"
     >
-      <div className="absolute inset-0 bg-grid-pattern opacity-6 pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/20 to-background/80 pointer-events-none" />
 
       <div className="container mx-auto px-4 py-16 relative z-10">
         <div className="relative w-full overflow-hidden min-h-[340px] flex items-center justify-center">
-          {/* Left Arrow */}
+          {/* Left Arrow — Desktop only */}
           <button
             onClick={() => {
               setDirection(-1);
               setIdx((s) => (s - 1 + slidesCount) % slidesCount);
             }}
             aria-label="Previous slide"
-            className="absolute left-0 md:left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 md:w-14 md:h-14 rounded-full bg-gradient-to-r from-neon-cyan to-neon-blue flex items-center justify-center text-white shadow-lg hover:shadow-2xl hover:shadow-primary/50 hover:scale-110 transition-all active:scale-95 group"
+            className="absolute left-0 md:left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 md:w-14 md:h-14 rounded-full bg-white/80 border border-slate-200 hidden md:flex items-center justify-center text-slate-700 shadow-sm hover:shadow-primary/20 hover:scale-110 hover:bg-white transition-all active:scale-95 group"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="group-hover:-translate-x-0.5 transition-transform"
-            >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:-translate-x-0.5 transition-transform">
               <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
           </button>
 
-          {/* Right Arrow */}
+          {/* Right Arrow — Desktop only */}
           <button
             onClick={() => {
               setDirection(1);
               setIdx((s) => (s + 1) % slidesCount);
             }}
             aria-label="Next slide"
-            className="absolute right-0 md:right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 md:w-14 md:h-14 rounded-full bg-gradient-to-r from-neon-cyan to-neon-blue flex items-center justify-center text-white shadow-lg hover:shadow-2xl hover:shadow-primary/50 hover:scale-110 transition-all active:scale-95 group"
+            className="absolute right-0 md:right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 md:w-14 md:h-14 rounded-full bg-white/80 border border-slate-200 hidden md:flex items-center justify-center text-slate-700 shadow-sm hover:shadow-primary/20 hover:scale-110 hover:bg-white transition-all active:scale-95 group"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="group-hover:translate-x-0.5 transition-transform"
-            >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:translate-x-0.5 transition-transform">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
           </button>
@@ -282,7 +301,7 @@ export default function HeroSection(): JSX.Element {
               WebkitBackfaceVisibility: "hidden",
             }}
           >
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={active.id}
                 variants={getSlideVariant(direction)}
@@ -291,44 +310,45 @@ export default function HeroSection(): JSX.Element {
                 exit="exit"
                 className="max-w-4xl mx-auto text-center px-4"
                 style={{
-                  willChange: "transform, opacity, filter",
+                  willChange: "transform, opacity",
                   transform: "translate3d(0,0,0)",
                   backfaceVisibility: "hidden",
                   WebkitBackfaceVisibility: "hidden",
                   WebkitFontSmoothing: "antialiased",
                 }}
               >
-                <div
-                  className="inline-block px-6 py-2 rounded-full bg-white/90 border-2 border-primary/40 mb-6 shadow-lg"
-                >
-                  <span className="text-sm font-semibold text-sky-800">
+                <motion.div variants={contentVariants} className="inline-block px-6 py-2 rounded-full bg-white/80 md:backdrop-blur-md border border-slate-200/50 mb-6 shadow-sm">
+                  <span className="bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent font-medium tracking-wide text-sm md:text-base">
                     {active.subtitle}
                   </span>
-                </div>
+                </motion.div>
 
-                <h1
-                  className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 text-sky-900 drop-shadow-sm"
-                  style={{ lineHeight: 1.02 }}
+                <motion.h1
+                  variants={contentVariants}
+                  className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 text-slate-800 drop-shadow-sm"
+                  style={{ lineHeight: 1.1 }}
                 >
                   {active.title}
-                </h1>
+                </motion.h1>
 
-                <p className="text-lg md:text-xl text-sky-800 mb-8 leading-relaxed max-w-2xl mx-auto">
+                <motion.p variants={contentVariants} className="text-lg md:text-xl text-slate-600 mb-8 leading-relaxed max-w-2xl mx-auto">
                   {active.description}
-                </p>
+                </motion.p>
 
-                <Link
-                  to={active.link}
-                  className="inline-block px-6 md:px-8 py-3 md:py-4 rounded-lg font-semibold text-lg bg-gradient-to-r from-primary to-accent text-white hover:shadow-2xl hover:shadow-primary/50 hover:scale-105 transition-transform shadow-lg"
-                >
-                  {active.cta}
-                </Link>
+                <motion.div variants={contentVariants}>
+                  <Link
+                    to={active.link}
+                    className="inline-block px-8 py-4 rounded-xl font-semibold text-lg bg-gradient-to-r from-primary to-purple-600 text-white hover:shadow-lg hover:shadow-primary/40 hover:scale-105 transition-all active:scale-95 border border-primary/20"
+                  >
+                    {active.cta}
+                  </Link>
+                </motion.div>
               </motion.div>
             </AnimatePresence>
           </motion.div>
         </div>
 
-        <div className="flex justify-center gap-2 mt-6">
+        <div className="flex justify-center gap-3 mt-10">
           {SLIDES.map((_, i) => (
             <button
               key={i}
@@ -337,39 +357,40 @@ export default function HeroSection(): JSX.Element {
                 setIdx(i);
               }}
               aria-label={`Go to slide ${i + 1}`}
-              className={`h-2 rounded-full transition-all ${i === idx ? "w-8 bg-primary shadow-lg" : "w-2 bg-sky-400 hover:bg-primary/70"
+              className={`h-1.5 rounded-full transition-all duration-300 ${i === idx ? "w-8 bg-primary" : "w-2 bg-slate-300 hover:bg-slate-400"
                 }`}
             />
           ))}
         </div>
       </div>
 
-      {/* STATS (unchanged) */}
-      <div className="container mx-auto px-4 pb-12">
+      {/* STATS */}
+      <div className="container mx-auto px-4 pb-12 relative z-10">
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          <motion.div className="glass-card p-6 text-center hover:neon-border transition">
-            <TrendingUp className="mx-auto mb-3 text-neon-cyan" size={36} />
-            <h3 className="text-3xl font-bold text-primary mb-1">
+          <div className="bg-white rounded-xl p-6 text-center hover:shadow-md transition-shadow border border-slate-200 hover:border-primary/20 group">
+            <TrendingUp className="mx-auto mb-3 text-cyan-500 group-hover:scale-110 transition-transform" size={36} />
+            <h3 className="text-3xl font-bold text-slate-800 mb-1">
               {totalIssues ?? "—"}
             </h3>
-            <p className="text-muted-foreground">মোট সমস্যা রিপোর্ট</p>
-          </motion.div>
+            <p className="text-slate-600">মোট সমস্যা রিপোর্ট</p>
+          </div>
 
-          <motion.div className="glass-card p-6 text-center hover:neon-border transition">
-            <Users className="mx-auto mb-3 text-neon-purple" size={36} />
-            <h3 className="text-3xl font-bold text-secondary mb-1">
+          <div className="bg-white rounded-xl p-6 text-center hover:shadow-md transition-shadow border border-slate-200 hover:border-primary/20 group">
+            <Users className="mx-auto mb-3 text-purple-500 group-hover:scale-110 transition-transform" size={36} />
+            <h3 className="text-3xl font-bold text-slate-800 mb-1">
               {activeUsers ?? "—"}
             </h3>
-            <p className="text-muted-foreground">সক্রিয় সদস্য</p>
-          </motion.div>
+            <p className="text-slate-600">সক্রিয় সদস্য</p>
+          </div>
 
-          <motion.div className="glass-card p-6 text-center hover:neon-border transition">
-            <CheckCircle2 className="mx-auto mb-3 text-neon-green" size={36} />
-            <h3 className="text-3xl font-bold text-accent mb-1">
+          <div className="bg-white rounded-xl p-6 text-center hover:shadow-md transition-shadow border border-slate-200 hover:border-primary/20 group">
+            <CheckCircle2 className="mx-auto mb-3 text-green-500 group-hover:scale-110 transition-transform" size={36} />
+            <h3 className="text-3xl font-bold text-slate-800 mb-1">
               {resolvedCount ?? "—"}
             </h3>
-            <p className="text-muted-foreground">সমাধান হয়েছে</p>
-          </motion.div>
+            <p className="text-slate-600">সমাধান হয়েছে</p>
+          </div>
         </div>
       </div>
     </section>

@@ -1,347 +1,440 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Paperclip, Users, MessageSquare, FileText } from 'lucide-react';
+import { Send, Bell, Mail, Users, Search, X, CheckCheck, Plus, Filter } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/services/api';
 
-interface Message {
+interface UserItem {
     id: string;
-    from: string;
-    to: string;
-    subject: string;
-    message: string;
-    timestamp: Date;
-    read: boolean;
+    name: string;
+    email: string;
+    department: string;
+    roll: string;
+    role: string;
 }
 
+type TabType = 'email' | 'push';
+type FilterMode = 'manual' | 'user' | 'department' | 'all';
+
 const CommunicationCenter = () => {
-    const [activeTab, setActiveTab] = useState<'inbox' | 'compose' | 'broadcast' | 'templates'>('inbox');
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [activeTab, setActiveTab] = useState<TabType>('email');
 
-    useEffect(() => {
-        if (activeTab === 'inbox') {
-            fetchMessages();
-        }
-    }, [activeTab]);
+    // Email state
+    const [emailSubject, setEmailSubject] = useState('');
+    const [emailBody, setEmailBody] = useState('');
+    const [emailFilterMode, setEmailFilterMode] = useState<FilterMode>('user');
+    const [emailSelectedUsers, setEmailSelectedUsers] = useState<string[]>([]);
+    const [emailSelectedDept, setEmailSelectedDept] = useState('');
+    const [manualEmails, setManualEmails] = useState('');
+    const [emailSearch, setEmailSearch] = useState('');
+    const [emailSending, setEmailSending] = useState(false);
 
-    const fetchMessages = async () => {
-        try {
-            const { data } = await api.get('/messages');
-            // Backend returns date string, need to parse to Date object for UI
-            const parsed = data.map((msg: any) => ({
-                ...msg,
-                id: msg._id,
-                timestamp: new Date(msg.createdAt),
-                from: msg.from?.name || 'Unknown'
-            }));
-            setMessages(parsed);
-        } catch (error) {
-            console.error(error);
-            toast.error('মেসেজ লোড করা যায়নি');
+    // Push state
+    const [pushTitle, setPushTitle] = useState('');
+    const [pushBody, setPushBody] = useState('');
+    const [pushUrl, setPushUrl] = useState('');
+    const [pushFilterMode, setPushFilterMode] = useState<FilterMode>('all');
+    const [pushSelectedUsers, setPushSelectedUsers] = useState<string[]>([]);
+    const [pushSelectedDept, setPushSelectedDept] = useState('');
+    const [pushSearch, setPushSearch] = useState('');
+    const [pushSending, setPushSending] = useState(false);
+
+    // Fetch all users
+    const { data: allUsers = [] } = useQuery<UserItem[]>({
+        queryKey: ['admin-all-users'],
+        queryFn: async () => {
+            const { data } = await api.get('/admin/all-users');
+            return data;
+        },
+        staleTime: 60000,
+    });
+
+    const departments = useMemo(() =>
+        [...new Set(allUsers.map(u => u.department).filter(Boolean))].sort()
+        , [allUsers]);
+
+    // Email: filtered users
+    const emailFilteredUsers = useMemo(() => {
+        let list = allUsers;
+        if (emailSearch) {
+            const s = emailSearch.toLowerCase();
+            list = list.filter(u => u.name?.toLowerCase().includes(s) || u.email?.toLowerCase().includes(s) || u.roll?.toLowerCase().includes(s));
         }
+        return list;
+    }, [allUsers, emailSearch]);
+
+    // Push: filtered users
+    const pushFilteredUsers = useMemo(() => {
+        let list = allUsers;
+        if (pushSearch) {
+            const s = pushSearch.toLowerCase();
+            list = list.filter(u => u.name?.toLowerCase().includes(s) || u.email?.toLowerCase().includes(s) || u.roll?.toLowerCase().includes(s));
+        }
+        return list;
+    }, [allUsers, pushSearch]);
+
+    // Toggle user selection
+    const toggleUser = (userId: string, list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>) => {
+        setList(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
     };
 
-    const [composeData, setComposeData] = useState({
-        to: '',
-        subject: '',
-        message: ''
-    });
+    // Select all visible
+    const selectAll = (filtered: UserItem[], setList: React.Dispatch<React.SetStateAction<string[]>>) => {
+        setList(filtered.map(u => u.id));
+    };
 
-    const [broadcastData, setBroadcastData] = useState({
-        title: '',
-        message: '',
-        target: 'all' as 'all' | 'students' | 'specific_dept'
-    });
-
-    const templates = [
-        {
-            id: '1',
-            name: 'Issue Received Confirmation',
-            content: 'আপনার ইস্যু গৃহীত হয়েছে এবং শীঘ্রই সমাধানের জন্য প্রক্রিয়া শুরু হবে।'
-        },
-        {
-            id: '2',
-            name: 'Issue Resolved',
-            content: 'আপনার ইস্যু সফলভাবে সমাধান করা হয়েছে। আপনার সহযোগিতার জন্য ধন্যবাদ।'
-        },
-        {
-            id: '3',
-            name: 'More Information Needed',
-            content: 'আপনার ইস্যু সমাধানের জন্য আরো তথ্য প্রয়োজন। অনুগ্রহ করে বিস্তারিত প্রদান করুন।'
-        },
-    ];
-
-    const handleSendMessage = async () => {
-        if (!composeData.to || !composeData.subject || !composeData.message) {
-            toast.error('সব ফিল্ড পূরণ করুন');
+    // Send email handler
+    const handleSendEmail = async () => {
+        if (!emailSubject.trim() || !emailBody.trim()) {
+            toast.error('সাবজেক্ট এবং মেইল বডি দিন');
             return;
         }
 
+        let recipients: string[] = [];
+        let manualEmailList: string[] = [];
+
+        if (emailFilterMode === 'user') {
+            if (emailSelectedUsers.length === 0) { toast.error('অন্তত একজন ইউজার সিলেক্ট করুন'); return; }
+            recipients = emailSelectedUsers;
+        } else if (emailFilterMode === 'department') {
+            if (!emailSelectedDept) { toast.error('ডিপার্টমেন্ট সিলেক্ট করুন'); return; }
+            recipients = allUsers.filter(u => u.department === emailSelectedDept).map(u => u.id);
+        } else if (emailFilterMode === 'all') {
+            recipients = allUsers.map(u => u.id);
+        } else if (emailFilterMode === 'manual') {
+            manualEmailList = manualEmails.split(/[,;\n]+/).map(e => e.trim()).filter(e => e.includes('@'));
+            if (manualEmailList.length === 0) { toast.error('অন্তত একটি ইমেইল দিন'); return; }
+        }
+
+        setEmailSending(true);
         try {
-            await api.post('/messages', {
-                // to: composeData.to, // For now ignoring 'to' mapping logic in this demo
-                subject: composeData.subject,
-                message: composeData.message,
-                type: 'direct'
+            const { data } = await api.post('/admin/send-email', {
+                recipients,
+                subject: emailSubject,
+                body: emailBody,
+                manualEmails: manualEmailList
             });
-            toast.success('মেসেজ পাঠানো হয়েছে');
-            setComposeData({ to: '', subject: '', message: '' });
-            setActiveTab('inbox');
-        } catch (error) {
-            toast.error('মেসেজ পাঠাতে সমস্যা হয়েছে');
+            toast.success(`✅ ${data.success} জনকে ইমেইল পাঠানো হয়েছে${data.failed > 0 ? ` (${data.failed} ব্যর্থ)` : ''}`);
+            setEmailSubject(''); setEmailBody(''); setEmailSelectedUsers([]); setManualEmails('');
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || 'ইমেইল পাঠাতে ব্যর্থ');
+        } finally {
+            setEmailSending(false);
         }
     };
 
-    const handleBroadcast = async () => {
-        if (!broadcastData.title || !broadcastData.message) {
-            toast.error('Title এবং Message পূরণ করুন');
+    // Send push handler
+    const handleSendPush = async () => {
+        if (!pushTitle.trim() || !pushBody.trim()) {
+            toast.error('টাইটেল এবং মেসেজ দিন');
             return;
         }
 
+        let recipients: string[] | string = [];
+
+        if (pushFilterMode === 'all') {
+            recipients = 'all';
+        } else if (pushFilterMode === 'user') {
+            if (pushSelectedUsers.length === 0) { toast.error('অন্তত একজন ইউজার সিলেক্ট করুন'); return; }
+            recipients = pushSelectedUsers;
+        } else if (pushFilterMode === 'department') {
+            if (!pushSelectedDept) { toast.error('ডিপার্টমেন্ট সিলেক্ট করুন'); return; }
+            recipients = allUsers.filter(u => u.department === pushSelectedDept).map(u => u.id);
+        }
+
+        setPushSending(true);
         try {
-            await api.post('/admin/send-bulk-email', {
-                title: broadcastData.title,
-                message: broadcastData.message,
-                target: broadcastData.target
+            const { data } = await api.post('/admin/send-push', {
+                recipients,
+                title: pushTitle,
+                body: pushBody,
+                url: pushUrl || '/user/dashboard'
             });
-            toast.success('ব্রডকাস্ট সফলভাবে পাঠানো হয়েছে');
-            setBroadcastData({ title: '', message: '', target: 'all' });
-        } catch (error) {
-            toast.error('ব্রডকাস্ট পাঠাতে সমস্যা হয়েছে');
+            toast.success(`🔔 ${data.success} জনকে পুশ নোটিফিকেশন পাঠানো হয়েছে`);
+            setPushTitle(''); setPushBody(''); setPushUrl(''); setPushSelectedUsers([]);
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || 'পুশ নোটিফিকেশন পাঠাতে ব্যর্থ');
+        } finally {
+            setPushSending(false);
         }
     };
 
-    const applyTemplate = (template: typeof templates[0]) => {
-        setComposeData({
-            ...composeData,
-            message: template.content
-        });
-        setActiveTab('compose');
-        toast.success('Template লোড করা হয়েছে');
-    };
-
-    return (
-        <div className="w-full">
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6"
-            >
-                <h1 className="text-3xl font-bold text-gray-800">💬 Communication Center</h1>
-                <p className="text-gray-600 mt-1">ইউজার এবং স্টাফ যোগাযোগ</p>
-            </motion.div>
-
-            {/* Tabs */}
-            <div className="flex items-center space-x-2 mb-6 border-b border-gray-200">
-                {[
-                    { id: 'inbox' as const, label: 'Inbox', icon: MessageSquare },
-                    { id: 'compose' as const, label: 'Compose', icon: Send },
-                    { id: 'broadcast' as const, label: 'Broadcast', icon: Users },
-                    { id: 'templates' as const, label: 'Templates', icon: FileText },
-                ].map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center space-x-2 px-4 py-3 border-b-2 transition-colors ${activeTab === tab.id
-                                ? 'border-sky-600 text-sky-600'
-                                : 'border-transparent text-gray-600 hover:text-gray-800'
-                                }`}
-                        >
-                            <Icon className="w-5 h-5" />
-                            <span className="font-medium">{tab.label}</span>
-                        </button>
-                    );
-                })}
+    // Reusable user selector component
+    const UserSelector = ({
+        filterMode, setFilterMode, selectedUsers, setSelectedUsers, selectedDept, setSelectedDept, search, setSearch, filteredUsers, showManual = false, manualValue = '', setManualValue = (_v: string) => { }
+    }: {
+        filterMode: FilterMode; setFilterMode: (m: FilterMode) => void;
+        selectedUsers: string[]; setSelectedUsers: React.Dispatch<React.SetStateAction<string[]>>;
+        selectedDept: string; setSelectedDept: (d: string) => void;
+        search: string; setSearch: (s: string) => void;
+        filteredUsers: UserItem[];
+        showManual?: boolean; manualValue?: string; setManualValue?: (v: string) => void;
+    }) => (
+        <div className="space-y-3">
+            {/* Filter Mode Tabs */}
+            <div className="flex flex-wrap gap-2">
+                {showManual && (
+                    <button onClick={() => setFilterMode('manual')} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${filterMode === 'manual' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                        <Plus className="w-3 h-3 inline mr-1" />Manual
+                    </button>
+                )}
+                <button onClick={() => setFilterMode('user')} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${filterMode === 'user' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    <Users className="w-3 h-3 inline mr-1" />User Select
+                </button>
+                <button onClick={() => setFilterMode('department')} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${filterMode === 'department' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    <Filter className="w-3 h-3 inline mr-1" />Department
+                </button>
+                <button onClick={() => setFilterMode('all')} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${filterMode === 'all' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    <CheckCheck className="w-3 h-3 inline mr-1" />All Users
+                </button>
             </div>
 
-            {/* Inbox Tab */}
-            {activeTab === 'inbox' && (
-                <div className="space-y-3">
-                    {messages.length === 0 ? (
-                        <Card>
-                            <CardContent className="p-12 text-center">
-                                <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                                <p className="text-gray-500">কোন মেসেজ নেই</p>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        messages.map((message) => (
-                            <motion.div
-                                key={message.id}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                            >
-                                <Card className={`hover:shadow-md transition-shadow cursor-pointer ${!message.read ? 'bg-sky-50' : ''}`}>
-                                    <CardContent className="p-4">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                                <div className="flex items-center space-x-3 mb-2">
-                                                    <p className="font-semibold text-gray-800">{message.from}</p>
-                                                    {!message.read && (
-                                                        <span className="px-2 py-0.5 bg-sky-600 text-white text-xs font-medium rounded-full">
-                                                            New
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className="font-medium text-gray-700 mb-1">{message.subject}</p>
-                                                <p className="text-sm text-gray-600 line-clamp-2">{message.message}</p>
-                                                <p className="text-xs text-gray-400 mt-2">
-                                                    {message.timestamp.toLocaleString('bn-BD')}
-                                                </p>
-                                            </div>
-                                            <button className="ml-4 px-4 py-2 bg-sky-100 hover:bg-sky-200 text-sky-700 rounded-lg text-sm font-medium transition-colors">
-                                                Reply
-                                            </button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </motion.div>
-                        ))
-                    )}
-                </div>
+            {/* Manual Email Input */}
+            {filterMode === 'manual' && showManual && (
+                <textarea
+                    value={manualValue}
+                    onChange={(e) => setManualValue(e.target.value)}
+                    placeholder="ইমেইল গুলো লিখুন (কমা বা নতুন লাইনে আলাদা করুন)&#10;example1@mail.com, example2@mail.com"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm"
+                    rows={3}
+                />
             )}
 
-            {/* Compose Tab */}
-            {activeTab === 'compose' && (
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">To (Roll/Email)</label>
-                                <input
-                                    type="text"
-                                    value={composeData.to}
-                                    onChange={(e) => setComposeData({ ...composeData, to: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
-                                    placeholder="2021-1-60-100 or email@icst.edu"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
-                                <input
-                                    type="text"
-                                    value={composeData.subject}
-                                    onChange={(e) => setComposeData({ ...composeData, subject: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
-                                    placeholder="Message subject"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                                <textarea
-                                    value={composeData.message}
-                                    onChange={(e) => setComposeData({ ...composeData, message: e.target.value })}
-                                    rows={6}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
-                                    placeholder="আপনার মেসেজ লিখুন..."
-                                />
-                            </div>
-
-                            <div className="flex items-center space-x-3">
-                                <button
-                                    onClick={handleSendMessage}
-                                    className="bg-sky-600 hover:bg-sky-700 text-white px-6 py-2 rounded-lg font-semibold flex items-center space-x-2 transition-colors"
-                                >
-                                    <Send className="w-5 h-5" />
-                                    <span>পাঠান</span>
-                                </button>
-                                <button className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2 rounded-lg font-semibold flex items-center space-x-2 transition-colors">
-                                    <Paperclip className="w-5 h-5" />
-                                    <span>Attach File</span>
-                                </button>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Broadcast Tab */}
-            {activeTab === 'broadcast' && (
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                            <p className="text-sm text-yellow-800">
-                                ⚠️ ব্রডকাস্ট মেসেজ সব selected ইউজারকে পাঠানো হবে। সাবধানে ব্যবহার করুন।
-                            </p>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Target Audience</label>
-                                <select
-                                    value={broadcastData.target}
-                                    onChange={(e) => setBroadcastData({ ...broadcastData, target: e.target.value as 'all' | 'students' | 'specific_dept' })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
-                                >
-                                    <option value="all">সব ইউজার</option>
-                                    <option value="students">শুধু Students</option>
-                                    <option value="specific_dept">Specific Department</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Announcement Title</label>
-                                <input
-                                    type="text"
-                                    value={broadcastData.title}
-                                    onChange={(e) => setBroadcastData({ ...broadcastData, title: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
-                                    placeholder="গুরুত্বপূর্ণ ঘোষণা"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                                <textarea
-                                    value={broadcastData.message}
-                                    onChange={(e) => setBroadcastData({ ...broadcastData, message: e.target.value })}
-                                    rows={6}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500"
-                                    placeholder="ব্রডকাস্ট মেসেজ..."
-                                />
-                            </div>
-
-                            <button
-                                onClick={handleBroadcast}
-                                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center space-x-2 transition-colors"
-                            >
-                                <Users className="w-5 h-5" />
-                                <span>ব্রডকাস্ট পাঠান</span>
-                            </button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Templates Tab */}
-            {activeTab === 'templates' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {templates.map((template) => (
-                        <motion.div
-                            key={template.id}
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                        >
-                            <Card className="hover:shadow-md transition-shadow">
-                                <CardContent className="p-6">
-                                    <h3 className="font-bold text-lg text-gray-800 mb-3">{template.name}</h3>
-                                    <p className="text-sm text-gray-600 mb-4">{template.content}</p>
-                                    <button
-                                        onClick={() => applyTemplate(template)}
-                                        className="w-full bg-sky-100 hover:bg-sky-200 text-sky-700 py-2 px-4 rounded-lg font-medium transition-colors"
-                                    >
-                                        Use Template
-                                    </button>
-                                </CardContent>
-                            </Card>
-                        </motion.div>
+            {/* Department Select */}
+            {filterMode === 'department' && (
+                <select
+                    value={selectedDept}
+                    onChange={(e) => setSelectedDept(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm"
+                >
+                    <option value="">ডিপার্টমেন্ট সিলেক্ট করুন</option>
+                    {departments.map(d => (
+                        <option key={d} value={d}>{d} ({allUsers.filter(u => u.department === d).length} জন)</option>
                     ))}
+                </select>
+            )}
+
+            {/* User Selector */}
+            {filterMode === 'user' && (
+                <div className="space-y-2">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="নাম, ইমেইল, বা রোল দিয়ে খুঁজুন..."
+                            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm"
+                        />
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-gray-500 px-1">
+                        <span>{selectedUsers.length} জন সিলেক্টেড</span>
+                        <div className="flex gap-2">
+                            <button onClick={() => selectAll(filteredUsers, setSelectedUsers)} className="text-purple-600 hover:underline font-medium">সব সিলেক্ট</button>
+                            <button onClick={() => setSelectedUsers([])} className="text-red-500 hover:underline font-medium">সব বাদ</button>
+                        </div>
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-50">
+                        {filteredUsers.map(user => (
+                            <label key={user.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-purple-50 cursor-pointer transition-colors">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedUsers.includes(user.id)}
+                                    onChange={() => toggleUser(user.id, selectedUsers, setSelectedUsers)}
+                                    className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-800 truncate">{user.name || 'Unknown'}</p>
+                                    <p className="text-xs text-gray-500 truncate">{user.email} • {user.department} • {user.roll}</p>
+                                </div>
+                            </label>
+                        ))}
+                        {filteredUsers.length === 0 && (
+                            <p className="text-center text-sm text-gray-400 py-4">কোনো ইউজার পাওয়া যায়নি</p>
+                        )}
+                    </div>
                 </div>
+            )}
+
+            {/* All Users info */}
+            {filterMode === 'all' && (
+                <div className="px-4 py-3 bg-purple-50 rounded-xl border border-purple-100">
+                    <p className="text-sm text-purple-700 font-medium">সকল {allUsers.length} জন ইউজারকে পাঠানো হবে</p>
+                </div>
+            )}
+        </div>
+    );
+
+    return (
+        <div className="w-full max-w-4xl mx-auto">
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+                <h1 className="text-3xl font-bold text-gray-800">📡 যোগাযোগ কেন্দ্র</h1>
+                <p className="text-gray-600 mt-1">ইউজারদের ইমেইল এবং পুশ নোটিফিকেশন পাঠান</p>
+            </motion.div>
+
+            {/* Tab Switcher */}
+            <div className="flex gap-2 mb-6">
+                <button
+                    onClick={() => setActiveTab('email')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${activeTab === 'email' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                    <Mail className="w-5 h-5" /> ইমেইল পাঠান
+                </button>
+                <button
+                    onClick={() => setActiveTab('push')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${activeTab === 'push' ? 'bg-green-600 text-white shadow-lg shadow-green-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                    <Bell className="w-5 h-5" /> পুশ নোটিফিকেশন
+                </button>
+            </div>
+
+            {/* Email Tab */}
+            {activeTab === 'email' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <Card className="shadow-lg border-0">
+                        <CardContent className="p-6 space-y-5">
+                            <div className="flex items-center gap-2 text-blue-600 mb-2">
+                                <Mail className="w-5 h-5" />
+                                <h2 className="text-lg font-bold">কাস্টম ইমেইল পাঠান</h2>
+                            </div>
+
+                            {/* Recipient Selector */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">প্রাপক নির্বাচন করুন</label>
+                                <UserSelector
+                                    filterMode={emailFilterMode} setFilterMode={setEmailFilterMode}
+                                    selectedUsers={emailSelectedUsers} setSelectedUsers={setEmailSelectedUsers}
+                                    selectedDept={emailSelectedDept} setSelectedDept={setEmailSelectedDept}
+                                    search={emailSearch} setSearch={setEmailSearch}
+                                    filteredUsers={emailFilteredUsers}
+                                    showManual={true} manualValue={manualEmails} setManualValue={setManualEmails}
+                                />
+                            </div>
+
+                            {/* Subject */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">সাবজেক্ট</label>
+                                <input
+                                    type="text"
+                                    value={emailSubject}
+                                    onChange={(e) => setEmailSubject(e.target.value)}
+                                    placeholder="ইমেইলের সাবজেক্ট লিখুন..."
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                                />
+                            </div>
+
+                            {/* Body */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">মেইল বডি</label>
+                                <textarea
+                                    value={emailBody}
+                                    onChange={(e) => setEmailBody(e.target.value)}
+                                    placeholder="ইমেইলের বিষয়বস্তু লিখুন..."
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm"
+                                    rows={6}
+                                />
+                            </div>
+
+                            {/* Send Button */}
+                            <button
+                                onClick={handleSendEmail}
+                                disabled={emailSending}
+                                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200 active:scale-[0.98]"
+                            >
+                                {emailSending ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        পাঠানো হচ্ছে...
+                                    </span>
+                                ) : (
+                                    <><Send className="w-5 h-5" /> ইমেইল পাঠান</>
+                                )}
+                            </button>
+                        </CardContent>
+                    </Card>
+                </motion.div>
+            )}
+
+            {/* Push Tab */}
+            {activeTab === 'push' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <Card className="shadow-lg border-0">
+                        <CardContent className="p-6 space-y-5">
+                            <div className="flex items-center gap-2 text-green-600 mb-2">
+                                <Bell className="w-5 h-5" />
+                                <h2 className="text-lg font-bold">পুশ নোটিফিকেশন পাঠান</h2>
+                            </div>
+
+                            {/* Recipient Selector */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">প্রাপক নির্বাচন করুন</label>
+                                <UserSelector
+                                    filterMode={pushFilterMode} setFilterMode={setPushFilterMode}
+                                    selectedUsers={pushSelectedUsers} setSelectedUsers={setPushSelectedUsers}
+                                    selectedDept={pushSelectedDept} setSelectedDept={setPushSelectedDept}
+                                    search={pushSearch} setSearch={setPushSearch}
+                                    filteredUsers={pushFilteredUsers}
+                                />
+                            </div>
+
+                            {/* Push Title */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">নোটিফিকেশন টাইটেল</label>
+                                <input
+                                    type="text"
+                                    value={pushTitle}
+                                    onChange={(e) => setPushTitle(e.target.value)}
+                                    placeholder="নোটিফিকেশনের শিরোনাম..."
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                                />
+                            </div>
+
+                            {/* Push Body */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">মেসেজ</label>
+                                <textarea
+                                    value={pushBody}
+                                    onChange={(e) => setPushBody(e.target.value)}
+                                    placeholder="নোটিফিকেশনের মেসেজ লিখুন..."
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none text-sm"
+                                    rows={4}
+                                />
+                            </div>
+
+                            {/* URL (optional) */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">লিংক (ঐচ্ছিক)</label>
+                                <input
+                                    type="text"
+                                    value={pushUrl}
+                                    onChange={(e) => setPushUrl(e.target.value)}
+                                    placeholder="/user/dashboard (ক্লিক করলে কোথায় যাবে)"
+                                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                                />
+                            </div>
+
+                            {/* Send Button */}
+                            <button
+                                onClick={handleSendPush}
+                                disabled={pushSending}
+                                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-200 active:scale-[0.98]"
+                            >
+                                {pushSending ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        পাঠানো হচ্ছে...
+                                    </span>
+                                ) : (
+                                    <><Bell className="w-5 h-5" /> পুশ নোটিফিকেশন পাঠান</>
+                                )}
+                            </button>
+                        </CardContent>
+                    </Card>
+                </motion.div>
             )}
         </div>
     );

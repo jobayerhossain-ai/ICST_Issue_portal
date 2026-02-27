@@ -10,17 +10,17 @@ const FAQItem = ({ question, answer }) => {
       className="neon-box p-5 rounded-xl cursor-pointer transition-all"
       onClick={() => setOpen(!open)}
     >
-      <div className="flex justify-between items-center">
-        <h3 className="font-semibold text-foreground">
+      <div className="flex justify-between items-center gap-4">
+        <h3 className="font-semibold text-foreground text-lg">
           {question}
         </h3>
-        <span className="text-cyan-400 text-2xl">
+        <span className="text-cyan-400 text-3xl font-light leading-none">
           {open ? "-" : "+"}
         </span>
       </div>
 
       <div
-        className={`text-muted-foreground text-sm mt-2 overflow-hidden transition-all duration-300 ${open ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
+        className={`text-muted-foreground text-base mt-3 overflow-hidden transition-all duration-300 ${open ? "max-h-60 opacity-100" : "max-h-0 opacity-0"
           }`}
       >
         {answer}
@@ -40,7 +40,7 @@ const Contact = () => {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12"
         >
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-neon-cyan to-neon-purple bg-clip-text text-transparent">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-neon-cyan to-neon-purple bg-clip-text text-transparent leading-snug py-1">
             যোগাযোগ করুন
           </h1>
           <p className="text-muted-foreground text-lg">

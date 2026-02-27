@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter, UserX, UserCheck, Key, Eye, BarChart } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
 import { toast } from 'sonner';
 
@@ -18,8 +19,7 @@ interface User {
 }
 
 const UserManagement = () => {
-    const [users, setUsers] = useState<User[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [roleFilter, setRoleFilter] = useState('all');
@@ -31,29 +31,23 @@ const UserManagement = () => {
     const [userStats, setUserStats] = useState<any>(null);
     const [loadingStats, setLoadingStats] = useState(false);
 
-    useEffect(() => {
-        fetchUsers();
-    }, []);
-
-    const fetchUsers = async () => {
-        try {
+    const { data: users = [] } = useQuery<User[]>({
+        queryKey: ['adminUsers'],
+        queryFn: async () => {
             const { data } = await api.get('/admin/users');
-            setUsers(data);
-        } catch (error) {
-            console.error(error);
-            toast.error('ইউজার লিস্ট লোড করা যায়নি');
-        } finally {
-            setLoading(false);
-        }
-    };
+            return data;
+        },
+        staleTime: 30000,
+        gcTime: 600000,
+        refetchInterval: 10000,
+        placeholderData: (prev) => prev ?? [],
+    });
 
     const handleBlockToggle = async (userId: string, isBlocked: boolean) => {
         try {
             await api.patch(`/admin/users/${userId}/block`);
-            setUsers(prev => prev.map(u =>
-                u._id === userId ? { ...u, isBlocked: !isBlocked } : u
-            ));
             toast.success(isBlocked ? 'ইউজার আনব্লক করা হয়েছে' : 'ইউজার ব্লক করা হয়েছে');
+            queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
         } catch (error) {
             toast.error('অপারেশন সফল হয়নি');
         }
@@ -91,7 +85,7 @@ const UserManagement = () => {
         }
     };
 
-    const filteredUsers = users.filter(user => {
+    const filteredUsers = users.filter((user: User) => {
         const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             user.roll.toLowerCase().includes(searchTerm.toLowerCase()) ||
             user.email.toLowerCase().includes(searchTerm.toLowerCase());
@@ -123,19 +117,19 @@ const UserManagement = () => {
                 <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
                     <CardContent className="p-4">
                         <p className="text-sm opacity-90">সক্রিয়</p>
-                        <p className="text-3xl font-bold">{users.filter(u => !u.isBlocked).length}</p>
+                        <p className="text-3xl font-bold">{users.filter((u: User) => !u.isBlocked).length}</p>
                     </CardContent>
                 </Card>
                 <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white">
                     <CardContent className="p-4">
                         <p className="text-sm opacity-90">ব্লক করা</p>
-                        <p className="text-3xl font-bold">{users.filter(u => u.isBlocked).length}</p>
+                        <p className="text-3xl font-bold">{users.filter((u: User) => u.isBlocked).length}</p>
                     </CardContent>
                 </Card>
                 <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
                     <CardContent className="p-4">
                         <p className="text-sm opacity-90">আজকে নতুন</p>
-                        <p className="text-3xl font-bold">12</p>
+                        <p className="text-3xl font-bold">{users.filter((u: User) => new Date(u.createdAt) >= new Date(new Date().setHours(0, 0, 0, 0))).length}</p>
                     </CardContent>
                 </Card>
             </div>
@@ -151,14 +145,14 @@ const UserManagement = () => {
                                 placeholder="নাম, রোল বা ইমেইল দিয়ে খুঁজুন..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                             />
                         </div>
 
                         <select
                             value={departmentFilter}
                             onChange={(e) => setDepartmentFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                         >
                             <option value="all">সব ডিপার্টমেন্ট</option>
                             <option value="CSE">CSE</option>
@@ -171,7 +165,7 @@ const UserManagement = () => {
                         <select
                             value={roleFilter}
                             onChange={(e) => setRoleFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-transparent"
                         >
                             <option value="all">সব Role</option>
                             <option value="user">User</option>
@@ -184,12 +178,7 @@ const UserManagement = () => {
             {/* User Table */}
             <Card>
                 <CardContent className="p-0">
-                    {loading ? (
-                        <div className="text-center py-12">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
-                            <p className="text-gray-600">লোড হচ্ছে...</p>
-                        </div>
-                    ) : filteredUsers.length === 0 ? (
+                    {filteredUsers.length === 0 ? (
                         <div className="text-center py-12">
                             <p className="text-gray-500">কোন ইউজার পাওয়া যায়নি</p>
                         </div>
@@ -208,7 +197,7 @@ const UserManagement = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {filteredUsers.map((user) => (
+                                    {filteredUsers.map((user: User) => (
                                         <motion.tr
                                             key={user._id}
                                             initial={{ opacity: 0 }}
@@ -350,7 +339,7 @@ const UserManagement = () => {
                             <div className="mt-6 flex justify-end">
                                 <button
                                     onClick={() => setShowDetailsModal(false)}
-                                    className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700"
+                                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
                                 >
                                     বন্ধ করুন
                                 </button>
@@ -379,7 +368,7 @@ const UserManagement = () => {
 
                             {loadingStats ? (
                                 <div className="text-center py-12">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
                                     <p className="text-gray-600">লোড হচ্ছে...</p>
                                 </div>
                             ) : userStats ? (
@@ -424,7 +413,7 @@ const UserManagement = () => {
                             <div className="mt-6 flex justify-end">
                                 <button
                                     onClick={() => setShowStatsModal(false)}
-                                    className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700"
+                                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
                                 >
                                     বন্ধ করুন
                                 </button>

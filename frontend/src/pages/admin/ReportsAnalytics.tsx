@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp, Calendar, PieChart as PieIcon, Download } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { useQuery } from '@tanstack/react-query';
 import api from '@/services/api';
 import { toast } from 'sonner';
 
@@ -13,40 +14,33 @@ interface AnalyticsData {
     departmentStats: { department: string; total: number; resolved: number; pending: number }[];
 }
 
+const defaultData: AnalyticsData = {
+    issuesByCategory: [],
+    issuesByStatus: [],
+    trendData: [],
+    departmentStats: []
+};
+
 const ReportsAnalytics = () => {
-    const [data, setData] = useState<AnalyticsData | null>(null);
-    const [loading, setLoading] = useState(true);
     const [timeRange, setTimeRange] = useState('30');
 
-    useEffect(() => {
-        fetchAnalytics();
-    }, [timeRange]);
-
-    const fetchAnalytics = async () => {
-        try {
+    const { data = defaultData } = useQuery<AnalyticsData>({
+        queryKey: ['analyticsData', timeRange],
+        queryFn: async () => {
             const { data: analyticsData } = await api.get(`/admin/analytics?days=${timeRange}`);
-            setData(analyticsData);
-        } catch (error) {
-            console.error(error);
-            toast.error('Analytics data লোড করা যায়নি');
-        } finally {
-            setLoading(false);
-        }
-    };
+            return analyticsData;
+        },
+        staleTime: 30000,
+        gcTime: 600000,
+        refetchInterval: 10000,
+        placeholderData: (prev) => prev ?? defaultData,
+    });
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
 
     const handleExport = () => {
         toast.success('Report export functionality coming soon');
     };
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-sky-600"></div>
-            </div>
-        );
-    }
 
     return (
         <div className="w-full p-6">
@@ -81,7 +75,7 @@ const ReportsAnalytics = () => {
                 </div>
             </motion.div>
 
-            {data && (
+            {data && (data.issuesByStatus.length > 0 || data.trendData.length > 0) ? (
                 <div className="space-y-6">
                     {/* Issues Trend Chart */}
                     <Card>
@@ -215,6 +209,14 @@ const ReportsAnalytics = () => {
                             </CardContent>
                         </Card>
                     </div>
+                </div>
+            ) : (
+                <div className="mt-8">
+                    <Card>
+                        <CardContent className="py-12 text-center text-gray-500">
+                            No analytics data available for the selected timeframe.
+                        </CardContent>
+                    </Card>
                 </div>
             )}
         </div>
