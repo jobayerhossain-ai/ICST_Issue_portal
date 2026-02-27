@@ -48,9 +48,9 @@ const UserDashboard = () => {
             const { data } = await api.get('/user/stats');
             return data;
         },
-        staleTime: 30000,          // Fresh for 30s — instant on re-mount
+        staleTime: 0,              // Never stale — always fetch fresh
         gcTime: 600000,            // Keep in cache 10 min
-        refetchInterval: 5000,     // Real-time sync every 5s
+        refetchInterval: 3000,     // Tight 3s poll for real-time feel
         refetchIntervalInBackground: false,
         placeholderData: (prev) => prev ?? defaultStats, // Show previous/default — NEVER skeleton
     });
@@ -62,9 +62,9 @@ const UserDashboard = () => {
             const { data } = await api.get('/user/activities');
             return data;
         },
-        staleTime: 30000,
+        staleTime: 0,
         gcTime: 600000,
-        refetchInterval: 10000,
+        refetchInterval: 3000,
         refetchIntervalInBackground: false,
         placeholderData: (prev) => prev ?? [],
     });
@@ -76,9 +76,9 @@ const UserDashboard = () => {
             const { data } = await api.get('/user/announcements');
             return data;
         },
-        staleTime: 60000,
+        staleTime: 0,
         gcTime: 600000,
-        refetchInterval: 30000,
+        refetchInterval: 3000,
         refetchIntervalInBackground: false,
         placeholderData: (prev) => prev ?? [],
     });

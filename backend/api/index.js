@@ -860,13 +860,20 @@ app.get('/api/user/stats', authenticateToken, checkMaintenanceMode, async (req, 
             )
         ]);
 
+        // Calculate Avg Resolution Time (hours)
+        const resolutionTimeRes = await db.select({
+            avgTime: sql`AVG(EXTRACT(EPOCH FROM (${issues.updatedAt} - ${issues.createdAt})) / 3600)`
+        })
+            .from(issues)
+            .where(and(eq(issues.submittedBy, userId), eq(issues.status, 'resolved')));
+
         res.json({
             total: Number(totalRes[0].count),
             pending: Number(pendingRes[0].count),
             inProgress: Number(inProgressRes[0].count),
             resolved: Number(resolvedRes[0].count),
             criticalCount: Number(criticalRes[0].count),
-            avgResolutionTime: 0
+            avgResolutionTime: resolutionTimeRes[0].avgTime ? Math.round(Number(resolutionTimeRes[0].avgTime)) : 0
         });
     } catch (err) {
         console.error(err);
@@ -1037,17 +1044,16 @@ app.get('/api/user/notifications', authenticateToken, async (req, res) => {
                 type: 'announcement',
                 title: a.subject || 'ঘোষণা',
                 message: a.message,
-                read: true, // announcements are informational
+                read: false, // Make it unread so it triggers the badge for everyone
                 createdAt: a.createdAt,
                 issueId: null
             });
         }
 
-        // Sort by createdAt descending
+        // 5. SORT BY DATE DESCENDING (NEWEST FIRST)
         notifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-        // Return top 20 notifications
-        res.json(notifications.slice(0, 20));
+        res.json(notifications.slice(0, 30)); // Return top 30
     } catch (err) {
         console.error('Notifications error:', err);
         res.status(500).json([]);

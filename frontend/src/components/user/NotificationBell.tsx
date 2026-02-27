@@ -38,9 +38,9 @@ const NotificationBell = () => {
             const { data } = await api.get('/user/notifications');
             return data;
         },
-        staleTime: 15000,          // Fresh for 15s
+        staleTime: 0,              // Always check for new updates
         gcTime: 600000,            // Cache 10 min
-        refetchInterval: 10000,    // Real-time: poll every 10s
+        refetchInterval: 3000,    // High frequency sync: 3s
         refetchIntervalInBackground: false,
         placeholderData: (prev) => prev ?? [],
     });
