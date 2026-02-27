@@ -1764,6 +1764,41 @@ app.get('/api/admin/all-users', authenticateToken, requireAdmin, async (req, res
     }
 });
 
+// ★ ADMIN: Test Email Configuration
+app.post('/api/admin/test-email', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { email } = req.body;
+        const testRecipient = email || req.user.email;
+
+        console.log(`📧 Starting SMTP diagnostic test for ${testRecipient}...`);
+
+        const result = await sendEmail(testRecipient, 'welcome', [req.user.name]);
+
+        if (result.success) {
+            res.json({
+                success: true,
+                message: `Test email sent successfully to ${testRecipient}`,
+                messageId: result.messageId
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'SMTP Test Failed',
+                error: result.error,
+                config: {
+                    host: process.env.EMAIL_HOST,
+                    port: process.env.EMAIL_PORT,
+                    user: process.env.EMAIL_USER,
+                    secure: process.env.EMAIL_SECURE
+                }
+            });
+        }
+    } catch (err) {
+        console.error('SMTP Diagnostic Error:', err);
+        res.status(500).json({ message: 'Diagnostic route failed', error: err.message });
+    }
+});
+
 // ★ ADMIN: Send custom email
 app.post('/api/admin/send-email', authenticateToken, requireAdmin, async (req, res) => {
     try {

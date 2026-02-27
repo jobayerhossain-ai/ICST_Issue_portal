@@ -237,7 +237,7 @@ const sendEmail = async (to, template, data) => {
             return { success: false, message: 'Email not configured' };
         }
 
-        const transporter = createTransport();
+        const transporter = createTransporter();
 
         // Handle template lookup if a string name is provided
         let subject, html;
