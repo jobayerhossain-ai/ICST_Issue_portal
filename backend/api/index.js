@@ -507,6 +507,25 @@ app.post('/api/issues', authenticateToken, checkMaintenanceMode, async (req, res
     }
 });
 
+// 📊 GET /api/issues/stats - Public Stats for Hero Section
+// IMPORTANT: Must be defined BEFORE /api/issues/:id
+app.get('/api/issues/stats', async (req, res) => {
+    try {
+        const [totalIssuesCount] = await db.select({ count: sql`count(*)` }).from(issues);
+        const [resolvedIssuesCount] = await db.select({ count: sql`count(*)` }).from(issues).where(eq(issues.status, 'resolved'));
+        const [totalUsersCount] = await db.select({ count: sql`count(*)` }).from(users);
+
+        res.json({
+            totalIssues: Number(totalIssuesCount?.count || 0),
+            resolvedIssues: Number(resolvedIssuesCount?.count || 0),
+            totalUsers: Number(totalUsersCount?.count || 0)
+        });
+    } catch (err) {
+        console.error('Stats fetch error:', err);
+        res.status(500).json({ totalIssues: 0, resolvedIssues: 0, totalUsers: 0 });
+    }
+});
+
 // View single issue - Requires authentication to prevent view count manipulation
 app.get('/api/issues/:id', optionalAuthenticateToken, checkMaintenanceMode, async (req, res) => {
     try {

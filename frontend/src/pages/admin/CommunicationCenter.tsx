@@ -109,6 +109,13 @@ const CommunicationCenter = () => {
         }
 
         setEmailSending(true);
+
+        // Watchdog timer: if Vercel kills the request at 10s, don't leave the UI hanging
+        const watchdog = setTimeout(() => {
+            setEmailSending(false);
+            toast.info('ইমেইল প্রসেসিং ব্যাকগ্রাউন্ডে চলছে। ফলাফল কিছুক্ষণ পর দেখতে পাবেন।', { duration: 6000 });
+        }, 11000); // 11 seconds (slightly more than Vercel's 10s limit)
+
         try {
             const { data } = await api.post('/admin/send-email', {
                 recipients,
@@ -116,9 +123,11 @@ const CommunicationCenter = () => {
                 body: emailBody,
                 manualEmails: manualEmailList
             });
+            clearTimeout(watchdog);
             toast.success(data.message || '✅ ইমেইল পাঠানো শুরু হয়েছে');
             setEmailSubject(''); setEmailBody(''); setEmailSelectedUsers([]); setManualEmails('');
         } catch (err: any) {
+            clearTimeout(watchdog);
             const errMsg = err.response?.data?.error || err.response?.data?.message || 'ইমেইল পাঠাতে ব্যর্থ';
             toast.error(errMsg, { duration: 5000 });
         } finally {
