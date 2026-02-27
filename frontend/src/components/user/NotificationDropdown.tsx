@@ -28,7 +28,12 @@ const NotificationDropdown = ({
         }
     };
 
-    const getTimeAgo = (date: Date) => {
+    const getTimeAgo = (dateInput: Date | string) => {
+        const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+
+        // Check for invalid date
+        if (isNaN(date.getTime())) return 'অজানা সময়';
+
         const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
 
         if (seconds < 60) return 'এইমাত্র';
