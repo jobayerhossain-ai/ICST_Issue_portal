@@ -1778,13 +1778,15 @@ app.post('/api/admin/test-email', authenticateToken, requireAdmin, async (req, r
             res.json({
                 success: true,
                 message: `Test email sent successfully to ${testRecipient}`,
-                messageId: result.messageId
+                messageId: result.messageId,
+                note: 'Please check your inbox (and spam folder).'
             });
         } else {
             res.status(500).json({
                 success: false,
                 message: 'SMTP Test Failed',
                 error: result.error,
+                diagnosis: 'This error usually happens due to wrong credentials or SMTP server restrictions.',
                 config: {
                     host: process.env.EMAIL_HOST,
                     port: process.env.EMAIL_PORT,

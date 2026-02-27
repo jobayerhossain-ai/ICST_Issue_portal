@@ -1,15 +1,22 @@
 const nodemailer = require('nodemailer');
 
 // Create transporter
-const createTransporter = () => {
-    const config = {
+const createTransporter = (testConfig = null) => {
+    const config = testConfig || {
         host: process.env.EMAIL_HOST || 'smtp.gmail.com',
         port: parseInt(process.env.EMAIL_PORT || '587'),
         secure: process.env.EMAIL_SECURE === 'true',
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASSWORD
-        }
+        },
+        tls: {
+            // Do not fail on invalid certificates (common on custom mail servers)
+            rejectUnauthorized: false
+        },
+        // Enable detailed logging in production logs if debug is on
+        logger: process.env.EMAIL_DEBUG === 'true',
+        debug: process.env.EMAIL_DEBUG === 'true'
     };
 
     return nodemailer.createTransport(config);
@@ -242,16 +249,18 @@ const sendEmail = async (to, template, data) => {
         // Handle template lookup if a string name is provided
         let subject, html;
         if (typeof template === 'function') {
-            const result = template(...data);
+            const result = template(...(Array.isArray(data) ? data : [data]));
             subject = result.subject;
             html = result.html;
         } else if (typeof template === 'string' && emailTemplates[template]) {
-            // If data is an object with subject/body, pass them
-            const result = emailTemplates[template](data.subject, data.body);
+            // Check if data is array or object and map accordingly
+            const result = Array.isArray(data)
+                ? emailTemplates[template](...data)
+                : emailTemplates[template](data.subject, data.body);
             subject = result.subject;
             html = result.html;
         } else {
-            throw new Error(`Invalid template: ${template}`);
+            throw new Error(`Invalid template identifier: ${template}`);
         }
 
         const mailOptions = {
