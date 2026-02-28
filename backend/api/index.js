@@ -1245,6 +1245,94 @@ app.post('/api/admin/system-config', authenticateToken, async (req, res) => {
     }
 });
 
+// ★ ADMIN: Granular System Reset (Mobile Style)
+app.post('/api/admin/system/reset', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { type } = req.body;
+        let details = "";
+
+        if (type === 'issues') {
+            await db.delete(issueVotedUsers);
+            await db.delete(issueTimeline);
+            await db.delete(comments);
+            await db.delete(issues);
+            details = "All issues, votes, comments, and timelines reset";
+        } else if (type === 'users') {
+            // Delete dependants before erasing users
+            await db.delete(issueVotedUsers);
+            await db.delete(issueTimeline);
+            await db.delete(comments);
+            await db.delete(issues);
+            await db.delete(messages);
+            await db.delete(pushSubscriptions);
+            await db.delete(passwordResetTokens);
+
+            // Delete all non-admins
+            await db.delete(users).where(sql`${users.role} != 'admin'`);
+            details = "All non-admin user accounts and related data reset";
+        } else if (type === 'all') {
+            await db.delete(issueVotedUsers);
+            await db.delete(issueTimeline);
+            await db.delete(comments);
+            await db.delete(issues);
+            await db.delete(messages);
+            await db.delete(auditLogs).where(sql`${auditLogs.action} != 'system_reset'`);
+            await db.delete(pushSubscriptions);
+            await db.delete(passwordResetTokens);
+            details = "All transactional data (issues, messages, some logs) reset";
+        } else if (type === 'factory') {
+            await db.delete(issueVotedUsers);
+            await db.delete(issueTimeline);
+            await db.delete(comments);
+            await db.delete(issues);
+            await db.delete(messages);
+            await db.delete(auditLogs);
+            await db.delete(pushSubscriptions);
+            await db.delete(passwordResetTokens);
+            await db.delete(articles);
+            await db.delete(users).where(sql`${users.id} != ${req.user.id}`);
+
+            // Reset system config to default
+            const hasConfig = await db.select().from(systemConfig).limit(1).then(r => r[0]);
+            if (hasConfig) {
+                await db.update(systemConfig).set({
+                    categories: ['Academic', 'Infrastructure', 'Canteen', 'Library', 'Transport', 'Other'],
+                    priorities: ['low', 'medium', 'high', 'critical'],
+                    maintenanceMode: false,
+                    allowRegistration: true,
+                    slaRules: {
+                        criticalResponseTime: 2,
+                        highResponseTime: 24,
+                        mediumResponseTime: 48
+                    }
+                }).where(eq(systemConfig.id, hasConfig.id));
+            }
+            details = "Full factory reset performed. All data except current admin cleared.";
+        } else {
+            return res.status(400).json({ message: "Invalid reset type" });
+        }
+
+        // Log the reset action if auditLogs still exists
+        try {
+            await db.insert(auditLogs).values({
+                adminId: req.user.id,
+                targetId: 'system',
+                targetType: 'system',
+                action: 'system_reset',
+                details: details,
+                ip: req.ip
+            });
+        } catch (e) {
+            console.error('Audit log for reset failed:', e.message);
+        }
+
+        res.json({ message: "Reset successful", details });
+    } catch (err) {
+        console.error('System reset error:', err);
+        res.status(500).json({ message: "Reset failed", error: err.message });
+    }
+});
+
 // Admin Activity Feed
 app.get('/api/admin/activity', authenticateToken, requireAdmin, async (req, res) => {
     try {

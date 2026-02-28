@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Save, RotateCcw, Plus, X } from 'lucide-react';
+import { Settings, Save, RotateCcw, Plus, X, AlertTriangle, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/services/api';
@@ -39,6 +39,10 @@ const SystemConfiguration = () => {
     const [saving, setSaving] = useState(false);
     const [newCategory, setNewCategory] = useState('');
     const [newPriority, setNewPriority] = useState('');
+    const [showResetModal, setShowResetModal] = useState(false);
+    const [resetType, setResetType] = useState<'issues' | 'users' | 'all' | 'factory' | null>(null);
+    const [resetConfirmText, setResetConfirmText] = useState('');
+    const [isResetting, setIsResetting] = useState(false);
 
     useQuery<SystemConfig>({
         queryKey: ['systemConfig'],
@@ -100,6 +104,31 @@ const SystemConfiguration = () => {
             ...config,
             priorities: config.priorities.filter(p => p !== priority)
         });
+    };
+    const initiateReset = (type: 'issues' | 'users' | 'all' | 'factory') => {
+        setResetType(type);
+        setResetConfirmText('');
+        setShowResetModal(true);
+    };
+
+    const handleReset = async () => {
+        if (resetConfirmText !== 'RESET') return;
+
+        setIsResetting(true);
+        try {
+            const { data } = await api.post('/admin/system/reset', { type: resetType });
+            toast.success(data.message || 'System reset successful');
+            setShowResetModal(false);
+            if (resetType === 'factory') {
+                window.location.reload();
+            } else {
+                queryClient.invalidateQueries();
+            }
+        } catch (error: any) {
+            toast.error(error.response?.data?.message || 'Reset failed');
+        } finally {
+            setIsResetting(false);
+        }
     };
 
     return (
@@ -303,7 +332,134 @@ const SystemConfiguration = () => {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Danger Zone */}
+                <Card className="border-red-200 bg-red-50/30">
+                    <CardContent className="p-6">
+                        <div className="flex items-center gap-2 mb-4 text-red-700">
+                            <AlertTriangle className="w-5 h-5" />
+                            <h3 className="text-lg font-bold">Danger Zone (সতর্কতামূলক এলাকা)</h3>
+                        </div>
+                        <p className="text-sm text-red-600 mb-6">
+                            নিচের অ্যাকশনগুলো স্থায়ীভাবে ডাটা ডিলিট করে দিবে। সাবধানে ব্যবহার করুন।
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-4 border border-red-100 rounded-lg bg-white flex flex-col justify-between">
+                                <div>
+                                    <h4 className="font-bold text-gray-800">Reset All Issues</h4>
+                                    <p className="text-xs text-gray-500 mb-4">সকল ইস্যু, ভোট এবং কমেন্ট মুছে যাবে। ইউজার অ্যাকাউন্ট ঠিক থাকবে।</p>
+                                </div>
+                                <button
+                                    onClick={() => initiateReset('issues')}
+                                    className="w-full py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors font-medium text-sm"
+                                >
+                                    Reset Issues
+                                </button>
+                            </div>
+
+                            <div className="p-4 border border-red-100 rounded-lg bg-white flex flex-col justify-between">
+                                <div>
+                                    <h4 className="font-bold text-gray-800">Reset User Accounts</h4>
+                                    <p className="text-xs text-gray-500 mb-4">এডমিন ছাড়া সকল ইউজার অ্যাকাউন্ট মুছে যাবে।</p>
+                                </div>
+                                <button
+                                    onClick={() => initiateReset('users')}
+                                    className="w-full py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors font-medium text-sm"
+                                >
+                                    Reset Users
+                                </button>
+                            </div>
+
+                            <div className="p-4 border border-red-100 rounded-lg bg-white flex flex-col justify-between">
+                                <div>
+                                    <h4 className="font-bold text-gray-800">Clear All Transactions</h4>
+                                    <p className="text-xs text-gray-500 mb-4">ইস্যু এবং মেসেজ মুছে যাবে। ইউজার এবং কনফিগারেশন ঠিক থাকবে।</p>
+                                </div>
+                                <button
+                                    onClick={() => initiateReset('all')}
+                                    className="w-full py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium text-sm"
+                                >
+                                    Clear All Data
+                                </button>
+                            </div>
+
+                            <div className="p-4 border border-red-200 rounded-lg bg-red-100/50 flex flex-col justify-between">
+                                <div>
+                                    <h4 className="font-bold text-red-800">Factory Reset</h4>
+                                    <p className="text-xs text-red-700 mb-4">রুট এডমিন ছাড়া সবকিছু মুছে যাবে এবং সিস্টেম একদম নতুনের মতো হয়ে যাবে।</p>
+                                </div>
+                                <button
+                                    onClick={() => initiateReset('factory')}
+                                    className="w-full py-2 bg-red-700 text-white rounded-md hover:bg-red-800 transition-colors font-medium text-sm flex items-center justify-center gap-2"
+                                >
+                                    <RotateCcw className="w-4 h-4" />
+                                    Full Factory Reset
+                                </button>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
+
+            {/* Reset Confirmation Modal */}
+            {showResetModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-red-100"
+                    >
+                        <div className="flex items-center gap-3 text-red-600 mb-4">
+                            <div className="p-2 bg-red-100 rounded-full">
+                                <AlertTriangle className="w-6 h-6" />
+                            </div>
+                            <h2 className="text-xl font-bold">আপনি কি নিশ্চিত?</h2>
+                        </div>
+
+                        <p className="text-gray-600 mb-6 font-medium">
+                            এটি একটি অতি গুরুত্বপূর্ণ সিদ্ধান্ত। আপনি <span className="text-red-600 font-bold underline capitalize">{resetType}</span> রিসেট করতে চাচ্ছেন। এই ডাটাগুলো আর ফিরে পাওয়া সম্ভব না।
+                        </p>
+
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+                            <p className="text-sm text-gray-700 mb-2">কনফার্ম করতে নিচে বড় হাতের অক্ষরে <span className="font-bold">RESET</span> লিখুন:</p>
+                            <input
+                                type="text"
+                                value={resetConfirmText}
+                                onChange={(e) => setResetConfirmText(e.target.value)}
+                                placeholder="RESET"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none uppercase font-bold text-center tracking-widest"
+                            />
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowResetModal(false)}
+                                className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                            >
+                                বাতিল করুন
+                            </button>
+                            <button
+                                onClick={handleReset}
+                                disabled={resetConfirmText !== 'RESET' || isResetting}
+                                className="flex-1 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {isResetting ? (
+                                    <>
+                                        <RotateCcw className="w-4 h-4 animate-spin" />
+                                        রিসেট হচ্ছে...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 className="w-4 h-4" />
+                                        নিশ্চিত করুন
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
         </div>
     );
 };
