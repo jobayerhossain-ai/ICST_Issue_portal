@@ -76,17 +76,4 @@ Backend চলবে: `http://localhost:5000`
 - [Frontend README](./frontend/README.md)
 - [Backend README](./backend/README.md)
 
-## 🔐 Default Admin
 
-```
-Email: jovayerhossain0@gmail.com
-Password: Jovayer1234&
-```
-
-## 📝 লাইসেন্স
-
-ISC
-
----
-
-তৈরি করেছেন ❤️ দিয়ে ICST Team
