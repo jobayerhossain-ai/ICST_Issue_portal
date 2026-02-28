@@ -79,7 +79,7 @@ const App = () => (
                 <Route
                   path="/"
                   element={
-                    <div className="flex flex-col min-h-screen pt-20">
+                    <div className="flex flex-col min-h-full h-full overflow-y-auto pt-20">
                       <Navbar />
                       <main className="flex-1"><Index /></main>
                       <Footer />
@@ -90,7 +90,7 @@ const App = () => (
                 <Route
                   path="/issues"
                   element={
-                    <div className="flex flex-col min-h-screen pt-20">
+                    <div className="flex flex-col min-h-full h-full overflow-y-auto pt-20">
                       <Navbar />
                       <main className="flex-1"><Issues /></main>
                       <Footer />
@@ -102,7 +102,7 @@ const App = () => (
                 <Route
                   path="/issues/:id"
                   element={
-                    <div className="flex flex-col min-h-screen pt-20">
+                    <div className="flex flex-col min-h-full h-full overflow-y-auto pt-20">
                       <Navbar />
                       <main className="flex-1"><IssueDetails /></main>
                       <Footer />
@@ -113,7 +113,7 @@ const App = () => (
                 <Route
                   path="/submit"
                   element={
-                    <div className="flex flex-col min-h-screen pt-20">
+                    <div className="flex flex-col min-h-full h-full overflow-y-auto pt-20">
                       <Navbar />
                       <main className="flex-1"><Submit /></main>
                       <Footer />
@@ -124,7 +124,7 @@ const App = () => (
                 <Route
                   path="/about"
                   element={
-                    <div className="flex flex-col min-h-screen pt-20">
+                    <div className="flex flex-col min-h-full h-full overflow-y-auto pt-20">
                       <Navbar />
                       <main className="flex-1"><About /></main>
                       <Footer />
@@ -135,7 +135,7 @@ const App = () => (
                 <Route
                   path="/contact"
                   element={
-                    <div className="flex flex-col min-h-screen pt-20">
+                    <div className="flex flex-col min-h-full h-full overflow-y-auto pt-20">
                       <Navbar />
                       <main className="flex-1"><Contact /></main>
                       <Footer />

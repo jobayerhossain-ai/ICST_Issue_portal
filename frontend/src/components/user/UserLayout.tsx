@@ -89,9 +89,9 @@ const UserLayout = () => {
             </AnimatePresence>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Header (Visible on all screens now for parity) */}
-                <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+                <header className="shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-100 p-4 flex items-center justify-between z-30 shadow-sm">
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => setSidebarOpen(prev => !prev)}
