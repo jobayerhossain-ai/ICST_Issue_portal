@@ -25,22 +25,17 @@ const Navbar = () => {
 
   // ─── BODY SCROLL LOCK ───
   // When the mobile menu opens, lock the body so the background doesn't scroll.
-  // This prevents Lenis and native scroll from interfering with touch events.
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
       document.body.style.touchAction = "none";
-      // Also tell Lenis to stop if it exists
-      document.documentElement.classList.add("lenis-stopped");
     } else {
       document.body.style.overflow = "";
       document.body.style.touchAction = "";
-      document.documentElement.classList.remove("lenis-stopped");
     }
     return () => {
       document.body.style.overflow = "";
       document.body.style.touchAction = "";
-      document.documentElement.classList.remove("lenis-stopped");
     };
   }, [isOpen]);
 
@@ -126,7 +121,6 @@ const Navbar = () => {
             - Body scroll locked
             - Programmatic navigation for 100% reliability
             - onPointerDown for instant response
-            - data-lenis-prevent to isolate from smooth scroll
         ═══════════════════════════════════════════════════ */}
         <AnimatePresence>
           {isOpen && (
@@ -162,7 +156,6 @@ const Navbar = () => {
                   mass: 0.8,
                 }}
                 className="fixed top-0 right-0 h-[100dvh] w-4/5 max-w-[320px] bg-white shadow-2xl border-l border-slate-200/50 z-[100] md:hidden flex flex-col"
-                data-lenis-prevent
                 style={{
                   WebkitTapHighlightColor: "transparent",
                   overscrollBehavior: "contain",
@@ -186,7 +179,6 @@ const Navbar = () => {
                 {/* Sidebar Content */}
                 <div
                   className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-1.5"
-                  data-lenis-prevent
                 >
                   {navLinks.map((link) => (
                     <button
