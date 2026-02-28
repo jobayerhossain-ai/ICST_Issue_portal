@@ -70,7 +70,10 @@ const systemConfig = pgTable("system_config", {
     emailSecure: boolean("email_secure").default(false),
     emailUser: text("email_user"),
     emailPassword: text("email_password"),
-    emailFromName: text("email_from_name").default("ICST Issue Portal")
+    emailFromName: text("email_from_name").default("ICST Issue Portal"),
+    // Resend API (primary email provider for Vercel)
+    resendApiKey: text("resend_api_key"),
+    emailFrom: text("email_from").default("onboarding@resend.dev")
 });
 
 const articles = pgTable("articles", {

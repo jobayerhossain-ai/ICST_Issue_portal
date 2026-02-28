@@ -7,23 +7,28 @@ import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface EmailConfig {
+    resendApiKey?: string;
+    emailFrom?: string;
+    emailFromName?: string;
+    // Legacy SMTP (local fallback)
     emailHost?: string;
     emailPort?: number;
     emailSecure?: boolean;
     emailUser?: string;
     emailPassword?: string;
-    emailFromName?: string;
 }
 
 const EmailSettings = () => {
     const queryClient = useQueryClient();
     const [config, setConfig] = useState<EmailConfig>({
+        resendApiKey: '',
+        emailFrom: 'onboarding@resend.dev',
+        emailFromName: 'ICST Issue Portal',
         emailHost: '',
         emailPort: 587,
         emailSecure: false,
         emailUser: '',
         emailPassword: '',
-        emailFromName: 'ICST Issue Portal',
     });
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
@@ -149,117 +154,117 @@ const EmailSettings = () => {
                 </motion.div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Server Settings */}
-                <Card>
+            <div className="space-y-6">
+                {/* Resend Section (Primary) */}
+                <Card className="border-sky-200 ring-1 ring-sky-100">
                     <CardContent className="p-6 space-y-4">
-                        <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                        <div className="flex items-center gap-2 mb-1">
                             <span className="w-2 h-2 bg-sky-500 rounded-full" />
-                            Server Settings
-                        </h3>
+                            <h3 className="text-base font-bold text-gray-800">Resend API</h3>
+                            <span className="ml-2 px-2 py-0.5 text-xs font-semibold bg-sky-100 text-sky-700 rounded-full">✅ Recommended — Works on Vercel</span>
+                        </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">SMTP Host</label>
-                            <input
-                                id="email-host"
-                                type="text"
-                                value={config.emailHost}
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Resend API Key</label>
+                            <div className="relative">
+                                <input
+                                    id="resend-api-key"
+                                    type={showPassword ? 'text' : 'password'}
+                                    value={config.resendApiKey}
+                                    onChange={e => setConfig({ ...config, resendApiKey: e.target.value })}
+                                    placeholder="re_xxxxxxxxxxxxxxxxxxxx"
+                                    className={`${inputClass} pr-10`}
+                                />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1">Get your API key from <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-sky-500 hover:underline">resend.com/api-keys</a></p>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1.5">From Email</label>
+                                <input
+                                    id="email-from"
+                                    type="email"
+                                    value={config.emailFrom}
+                                    onChange={e => setConfig({ ...config, emailFrom: e.target.value })}
+                                    placeholder="onboarding@resend.dev"
+                                    className={inputClass}
+                                />
+                                <p className="text-xs text-gray-400 mt-1">Use a verified domain email for production</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1.5">From Name</label>
+                                <input
+                                    id="email-from-name"
+                                    type="text"
+                                    value={config.emailFromName}
+                                    onChange={e => setConfig({ ...config, emailFromName: e.target.value })}
+                                    placeholder="ICST Issue Portal"
+                                    className={inputClass}
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* SMTP Section (Fallback) */}
+                <Card className="opacity-80">
+                    <CardContent className="p-6 space-y-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="w-2 h-2 bg-gray-400 rounded-full" />
+                            <h3 className="text-base font-bold text-gray-700">SMTP Settings</h3>
+                            <span className="ml-2 px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-500 rounded-full">Fallback (local dev only)</span>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1.5">SMTP Host</label>
+                            <input id="email-host" type="text" value={config.emailHost}
                                 onChange={e => setConfig({ ...config, emailHost: e.target.value })}
-                                placeholder="smtp.gmail.com"
-                                className={inputClass}
-                            />
+                                placeholder="smtp.gmail.com" className={inputClass} />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">Port</label>
-                                <input
-                                    id="email-port"
-                                    type="number"
-                                    value={config.emailPort}
+                                <label className="block text-sm font-medium text-gray-600 mb-1.5">Port</label>
+                                <input id="email-port" type="number" value={config.emailPort}
                                     onChange={e => setConfig({ ...config, emailPort: Number(e.target.value) })}
-                                    placeholder="587"
-                                    className={inputClass}
-                                />
+                                    placeholder="587" className={inputClass} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1.5">Encryption</label>
+                                <label className="block text-sm font-medium text-gray-600 mb-1.5">Encryption</label>
                                 <div className="flex gap-2 mt-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => setConfig({ ...config, emailSecure: false, emailPort: 587 })}
-                                        className={`flex-1 py-2 text-sm rounded-lg border transition font-medium ${!config.emailSecure ? 'bg-sky-600 text-white border-sky-600' : 'bg-gray-50 text-gray-600 border-gray-300 hover:bg-gray-100'}`}
-                                    >
+                                    <button type="button" onClick={() => setConfig({ ...config, emailSecure: false, emailPort: 587 })}
+                                        className={`flex-1 py-2 text-sm rounded-lg border transition font-medium ${!config.emailSecure ? 'bg-sky-600 text-white border-sky-600' : 'bg-gray-50 text-gray-600 border-gray-300 hover:bg-gray-100'}`}>
                                         TLS (587)
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setConfig({ ...config, emailSecure: true, emailPort: 465 })}
-                                        className={`flex-1 py-2 text-sm rounded-lg border transition font-medium ${config.emailSecure ? 'bg-sky-600 text-white border-sky-600' : 'bg-gray-50 text-gray-600 border-gray-300 hover:bg-gray-100'}`}
-                                    >
+                                    <button type="button" onClick={() => setConfig({ ...config, emailSecure: true, emailPort: 465 })}
+                                        className={`flex-1 py-2 text-sm rounded-lg border transition font-medium ${config.emailSecure ? 'bg-sky-600 text-white border-sky-600' : 'bg-gray-50 text-gray-600 border-gray-300 hover:bg-gray-100'}`}>
                                         SSL (465)
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
-
-                {/* Auth Settings */}
-                <Card>
-                    <CardContent className="p-6 space-y-4">
-                        <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
-                            <span className="w-2 h-2 bg-indigo-500 rounded-full" />
-                            Authentication
-                        </h3>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">From Name</label>
-                            <input
-                                id="email-from-name"
-                                type="text"
-                                value={config.emailFromName}
-                                onChange={e => setConfig({ ...config, emailFromName: e.target.value })}
-                                placeholder="ICST Issue Portal"
-                                className={inputClass}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address (User)</label>
-                            <input
-                                id="email-user"
-                                type="email"
-                                value={config.emailUser}
+                            <label className="block text-sm font-medium text-gray-600 mb-1.5">Email Address (User)</label>
+                            <input id="email-user" type="email" value={config.emailUser}
                                 onChange={e => setConfig({ ...config, emailUser: e.target.value })}
-                                placeholder="your@gmail.com"
-                                className={inputClass}
-                            />
+                                placeholder="your@gmail.com" className={inputClass} />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Password / App Password</label>
-                            <div className="relative">
-                                <input
-                                    id="email-password"
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={config.emailPassword}
-                                    onChange={e => setConfig({ ...config, emailPassword: e.target.value })}
-                                    placeholder="••••••••••••••••"
-                                    className={`${inputClass} pr-10`}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                                >
-                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
-                            </div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1.5">SMTP Password</label>
+                            <input id="email-password" type="password" value={config.emailPassword}
+                                onChange={e => setConfig({ ...config, emailPassword: e.target.value })}
+                                placeholder="••••••••••••••••" className={inputClass} />
                         </div>
                     </CardContent>
                 </Card>
             </div>
+
 
             {/* Tips Card */}
             <motion.div

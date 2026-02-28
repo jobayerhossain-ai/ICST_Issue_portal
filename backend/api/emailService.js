@@ -1,56 +1,12 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+const nodemailer = require('nodemailer'); // SMTP fallback for local dev
 
-// Keep a singleton transporter instance to reuse connections
-let transporterInstance = null;
-let lastConfigHash = null; // To detect when db settings change
+// ============================================================
+// ★ Resend (Primary — works on Vercel via HTTPS)
+// ★ Nodemailer SMTP (Fallback — local dev only)
+// ============================================================
 
-const createTransporter = (dbConfig = null) => {
-    // Build a hash from the current config to detect changes
-    const currentHash = dbConfig
-        ? `${dbConfig.emailHost}:${dbConfig.emailPort}:${dbConfig.emailUser}:${dbConfig.emailSecure}`
-        : 'env';
-
-    // If instance already exists and config hasn't changed, return it
-    if (transporterInstance && lastConfigHash === currentHash) return transporterInstance;
-
-    // Config is sourced from DB first, then falls back to .env
-    const host = (dbConfig && dbConfig.emailHost) || process.env.EMAIL_HOST || 'smtp.gmail.com';
-    const port = (dbConfig && dbConfig.emailPort) || parseInt(process.env.EMAIL_PORT || '587');
-    const secure = (dbConfig && dbConfig.emailSecure != null) ? dbConfig.emailSecure : (process.env.EMAIL_SECURE === 'true');
-    const user = (dbConfig && dbConfig.emailUser) || process.env.EMAIL_USER;
-    const pass = (dbConfig && dbConfig.emailPassword) || process.env.EMAIL_PASSWORD;
-
-    const config = {
-        host,
-        port,
-        secure,
-        auth: { user, pass },
-        pool: true, // Use SMTP connection pooling
-        maxConnections: 5,
-        maxMessages: 100,
-        tls: {
-            rejectUnauthorized: false
-        },
-        // Strict timeouts to avoid hanging serverless functions
-        connectionTimeout: 10000,
-        greetingTimeout: 15000,
-        socketTimeout: 20000,
-        logger: process.env.EMAIL_DEBUG === 'true',
-        debug: process.env.EMAIL_DEBUG === 'true'
-    };
-
-    console.log(`📡 Creating new SMTP transporter for ${config.host}:${config.port} (source: ${dbConfig ? 'database' : '.env'})`);
-    transporterInstance = nodemailer.createTransport(config);
-
-    // Track connection state and config hash
-    transporterInstance.verified = false;
-    lastConfigHash = currentHash;
-
-    return transporterInstance;
-};
-
-// ★ Helper: Fetch latest SMTP config from DB (used at send-time)
-// This is a lazy-load: it only imports the db to avoid circular deps.
+// ★ Helper: Fetch latest config from DB (lazy-loaded to avoid circular deps)
 let _db = null;
 let _systemConfig = null;
 const getDbEmailConfig = async () => {
@@ -64,14 +20,28 @@ const getDbEmailConfig = async () => {
             _systemConfig = schema.systemConfig;
         }
         const rows = await _db.select().from(_systemConfig).limit(1);
-        if (rows.length > 0 && rows[0].emailHost) {
-            return rows[0]; // Has DB config
-        }
-        return null; // Fall back to .env
+        if (rows.length > 0) return rows[0];
+        return null;
     } catch (err) {
-        console.warn('⚠️ Could not fetch DB email config, falling back to .env:', err.message);
+        console.warn('⚠️ Could not fetch DB email config:', err.message);
         return null;
     }
+};
+
+// ★ Get the effective sending config (DB > .env)
+const getEmailConfig = async () => {
+    const dbConfig = await getDbEmailConfig();
+    return {
+        resendApiKey: (dbConfig && dbConfig.resendApiKey) || process.env.RESEND_API_KEY || null,
+        fromEmail: (dbConfig && dbConfig.emailFrom) || process.env.EMAIL_FROM || 'onboarding@resend.dev',
+        fromName: (dbConfig && dbConfig.emailFromName) || process.env.EMAIL_FROM_NAME || 'ICST Issue Portal',
+        // SMTP fallback (for local dev if no Resend key)
+        smtpHost: process.env.EMAIL_HOST || 'smtp.gmail.com',
+        smtpPort: parseInt(process.env.EMAIL_PORT || '587'),
+        smtpSecure: process.env.EMAIL_SECURE === 'true',
+        smtpUser: process.env.EMAIL_USER || null,
+        smtpPass: process.env.EMAIL_PASSWORD || null,
+    };
 };
 
 
@@ -291,74 +261,62 @@ ${body}
 // Send Email Function
 const sendEmail = async (to, template, data) => {
     try {
-        // Fetch latest config from DB (falls back to .env automatically in createTransporter)
-        const dbConfig = await getDbEmailConfig();
-
-        // Check if email credentials exist (DB or .env)
-        const user = (dbConfig && dbConfig.emailUser) || process.env.EMAIL_USER;
-        const pass = (dbConfig && dbConfig.emailPassword) || process.env.EMAIL_PASSWORD;
-        if (!user || !pass) {
-            console.warn('⚠️ Email not configured. Skipping email send.');
-            return { success: false, message: 'Email not configured' };
-        }
-
-        const transporter = createTransporter(dbConfig);
-        const fromName = (dbConfig && dbConfig.emailFromName) || 'ICST Issue Portal';
-
-        // Verify connection once on first use
-        if (!transporterInstance.verified) {
-            try {
-                await transporter.verify();
-                transporterInstance.verified = true;
-                console.log('✅ SMTP Connection verified');
-            } catch (vErr) {
-                console.error('❌ SMTP Verification failed:', vErr.message);
-                // Continue anyway, it might work during send
-            }
-        }
-
-        // Handle template lookup if a string name is provided
+        // Resolve template
         let subject, html;
         if (typeof template === 'function') {
             const result = template(...(Array.isArray(data) ? data : [data]));
-            subject = result.subject;
-            html = result.html;
+            subject = result.subject; html = result.html;
         } else if (typeof template === 'string' && emailTemplates[template]) {
-            // Check if data is array or object and map accordingly
             const result = Array.isArray(data)
                 ? emailTemplates[template](...data)
                 : emailTemplates[template](data.subject, data.body);
-            subject = result.subject;
-            html = result.html;
+            subject = result.subject; html = result.html;
         } else {
-            throw new Error(`Invalid template identifier: ${template}`);
+            throw new Error(`Invalid template: ${template}`);
         }
 
-        const mailOptions = {
-            from: `"${fromName}" <${user}>`,
-            to,
-            subject,
-            html,
-            envelope: {
-                from: user,
-                to: to
+        // Get effective config (DB > .env)
+        const cfg = await getEmailConfig();
+
+        // ─── PRIMARY: Resend (works on Vercel) ───────────────────────
+        if (cfg.resendApiKey) {
+            console.log(`📧 Sending via Resend to ${to}...`);
+            const resend = new Resend(cfg.resendApiKey);
+            const { data: resendData, error } = await resend.emails.send({
+                from: `${cfg.fromName} <${cfg.fromEmail}>`,
+                to: [to],
+                subject,
+                html,
+            });
+            if (error) {
+                console.error(`❌ Resend error for ${to}:`, error);
+                return { success: false, error: error.message || JSON.stringify(error) };
             }
-        };
+            console.log(`✅ Resend: Email sent to ${to}`, resendData?.id);
+            return { success: true, messageId: resendData?.id };
+        }
 
-        const info = await transporter.sendMail(mailOptions);
-        console.log(`✅ Email successfully sent to ${to}:`, info.messageId);
+        // ─── FALLBACK: Nodemailer SMTP (local dev only) ──────────────
+        if (!cfg.smtpUser || !cfg.smtpPass) {
+            console.warn('⚠️ No RESEND_API_KEY or SMTP credentials. Skipping email.');
+            return { success: false, message: 'Email not configured' };
+        }
+        console.log(`📧 Sending via SMTP to ${to} (local fallback)...`);
+        const transporter = nodemailer.createTransport({
+            host: cfg.smtpHost, port: cfg.smtpPort, secure: cfg.smtpSecure,
+            auth: { user: cfg.smtpUser, pass: cfg.smtpPass },
+            tls: { rejectUnauthorized: false },
+            connectionTimeout: 10000, socketTimeout: 20000,
+        });
+        const info = await transporter.sendMail({
+            from: `"${cfg.fromName}" <${cfg.smtpUser}>`,
+            to, subject, html,
+        });
+        console.log(`✅ SMTP: Email sent to ${to}`, info.messageId);
         return { success: true, messageId: info.messageId };
+
     } catch (error) {
-        console.error(`❌ SMTP Error for ${to}:`, error.message);
-
-        // Reset verified state on connection-related errors
-        if (transporterInstance && (error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET' || error.code === 'EAUTH')) {
-            transporterInstance.verified = false;
-        }
-
-        if (error.code === 'EAUTH') {
-            console.error('Check your email credentials in Admin Panel > Email Settings or .env');
-        }
+        console.error(`❌ sendEmail error for ${to}:`, error.message);
         return { success: false, error: error.message };
     }
 };

@@ -150,7 +150,9 @@ const canSendMessage = (user) => {
             ADD COLUMN IF NOT EXISTS email_secure BOOLEAN DEFAULT FALSE,
             ADD COLUMN IF NOT EXISTS email_user TEXT,
             ADD COLUMN IF NOT EXISTS email_password TEXT,
-            ADD COLUMN IF NOT EXISTS email_from_name TEXT DEFAULT 'ICST Issue Portal'
+            ADD COLUMN IF NOT EXISTS email_from_name TEXT DEFAULT 'ICST Issue Portal',
+            ADD COLUMN IF NOT EXISTS resend_api_key TEXT,
+            ADD COLUMN IF NOT EXISTS email_from TEXT DEFAULT 'onboarding@resend.dev'
         `);
         console.log('✅ system_config email columns ready');
     } catch (err) {
