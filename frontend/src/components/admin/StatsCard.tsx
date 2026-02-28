@@ -21,34 +21,61 @@ const StatsCard = React.memo(({ title, value, subtitle, trend, trendValue, icon:
     };
 
     const getTrendColor = () => {
-        if (trend === 'up') return 'text-green-600 bg-green-50';
-        if (trend === 'down') return 'text-red-600 bg-red-50';
-        return 'text-slate-500 bg-slate-100';
+        if (trend === 'up') return 'text-green-600 bg-green-50/50';
+        if (trend === 'down') return 'text-red-600 bg-red-50/50';
+        return 'text-slate-500 bg-slate-100/50';
     };
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay }}
-            className="bg-white rounded-xl p-6 border border-slate-200 hover:shadow-md hover:border-primary/20 transition-all duration-300 group"
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{
+                delay,
+                type: 'spring',
+                stiffness: 100,
+                damping: 20,
+                mass: 1
+            }}
+            whileHover={{ y: -4, scale: 1.02 }}
+            className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] hover:border-primary/30 transition-all duration-500 group relative overflow-hidden"
         >
-            <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-lg bg-gradient-to-br ${color} shadow-lg`}>
+            {/* Glossy overlay effect */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+
+            <div className="flex items-center justify-between mb-5 relative z-10">
+                <motion.div
+                    whileHover={{ rotate: 10, scale: 1.1 }}
+                    className={`p-3 rounded-xl bg-gradient-to-br ${color} shadow-lg shadow-black/5`}
+                >
                     <Icon className="w-6 h-6 text-white" />
-                </div>
+                </motion.div>
                 {trend && trendValue && (
-                    <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium border border-transparent ${getTrendColor()}`}>
+                    <motion.div
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className={`flex items-center space-x-1 px-3 py-1.5 rounded-full text-xs font-bold backdrop-blur-md border border-white/20 ${getTrendColor()}`}
+                    >
                         {getTrendIcon()}
                         <span>{trendValue}</span>
-                    </div>
+                    </motion.div>
                 )}
             </div>
 
-            <div>
-                <p className="text-3xl font-bold text-slate-800 mb-1 group-hover:scale-105 transition-transform origin-left">{value}</p>
-                <p className="text-sm font-semibold text-slate-600">{title}</p>
-                {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+            <div className="relative z-10">
+                <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-3xl font-black text-slate-800 tracking-tight mb-0.5"
+                >
+                    {value}
+                </motion.p>
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">{title}</p>
+                {subtitle && (
+                    <div className="flex items-center mt-2 pt-2 border-t border-slate-100/50">
+                        <p className="text-[11px] font-medium text-slate-400 leading-relaxed italic">{subtitle}</p>
+                    </div>
+                )}
             </div>
         </motion.div>
     );
