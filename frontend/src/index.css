@@ -54,12 +54,12 @@
     /* Larger, softer corners */
   }
 
-  /* Lock document scroll — panels handle their own scrolling */
+  /* Prevent horizontal overflow only — allow natural vertical scrolling */
   html,
   body,
   #root {
     height: 100%;
-    overflow: hidden;
+    overflow-x: hidden;
   }
 
   * {

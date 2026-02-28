@@ -2,7 +2,7 @@ import React from 'react';
 
 export const LiquidBackground = ({ children }: { children: React.ReactNode }) => {
     return (
-        <div className="relative h-screen w-full overflow-hidden bg-white text-slate-800">
+        <div className="relative min-h-screen w-full bg-white text-slate-800">
             {/* Performance-Optimized Background — No mix-blend on mobile (handled by CSS) */}
             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-gradient-to-br from-white via-sky-50 to-purple-50">
 
@@ -20,7 +20,7 @@ export const LiquidBackground = ({ children }: { children: React.ReactNode }) =>
             </div>
 
             {/* Content Layer */}
-            <div className="relative z-10 w-full h-full">
+            <div className="relative z-10 w-full min-h-screen">
                 {children}
             </div>
         </div>

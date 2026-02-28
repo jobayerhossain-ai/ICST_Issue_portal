@@ -5,11 +5,11 @@ import { ExternalLink, Globe } from "lucide-react";
 
 const AdminLayout = () => {
   return (
-    <div className="h-screen flex w-full overflow-hidden">
+    <div className="min-h-screen flex w-full">
       <AdminSidebar />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-16 shrink-0 flex items-center justify-between border-b border-border glass-card z-40 px-4">
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="h-16 shrink-0 flex items-center justify-between border-b border-border glass-card sticky top-0 z-40 px-4">
           <div className="flex items-center gap-2">
             <SidebarTrigger className="h-10 w-10 rounded-xl bg-white/50 hover:bg-white border border-border transition-all shadow-sm hover:shadow-md" />
             <h1 className="ml-2 text-lg font-bold bg-gradient-to-r from-primary to-sky-600 bg-clip-text text-transparent hidden sm:block">
@@ -29,7 +29,7 @@ const AdminLayout = () => {
           </a>
         </header>
 
-        <main className="h-0 flex-1 overflow-y-auto">
+        <main className="flex-1">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <Outlet />
           </div>

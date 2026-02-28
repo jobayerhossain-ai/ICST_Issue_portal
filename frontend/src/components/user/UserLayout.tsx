@@ -14,7 +14,7 @@ const UserLayout = () => {
         setSidebarOpen(false);
     }, [location.pathname]);
 
-    // ─── BODY SCROLL LOCK ───
+    // ─── BODY SCROLL LOCK (only when mobile sidebar is open) ───
     useEffect(() => {
         if (sidebarOpen) {
             document.body.style.overflow = 'hidden';
@@ -34,9 +34,9 @@ const UserLayout = () => {
     }, []);
 
     return (
-        <div className="flex h-screen bg-slate-50 overflow-hidden">
-            {/* Desktop Sidebar — always visible on lg+ */}
-            <div className="hidden lg:block">
+        <div className="flex min-h-screen bg-slate-50">
+            {/* Desktop Sidebar — sticky on lg+ */}
+            <div className="hidden lg:block sticky top-0 h-screen shrink-0">
                 <UserSidebar isOpen={true} onClose={() => { }} />
             </div>
 
@@ -89,9 +89,9 @@ const UserLayout = () => {
             </AnimatePresence>
 
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                {/* Header (Visible on all screens now for parity) */}
-                <header className="shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-100 p-4 flex items-center justify-between z-30 shadow-sm">
+            <div className="flex-1 flex flex-col min-w-0">
+                {/* Header — sticky so it stays visible while scrolling */}
+                <header className="sticky top-0 z-30 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-100 p-4 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => setSidebarOpen(prev => !prev)}
@@ -124,8 +124,8 @@ const UserLayout = () => {
                     </div>
                 </header>
 
-                {/* Page Content */}
-                <main className="h-0 flex-1 overflow-y-auto">
+                {/* Page Content — naturally scrollable */}
+                <main className="flex-1">
                     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                         <Outlet />
                     </div>
