@@ -21,7 +21,7 @@ const UserRegister = () => {
         confirmPassword: ''
     });
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
@@ -96,16 +96,24 @@ const UserRegister = () => {
                                         বিভাগ <span className="text-red-500">*</span>
                                     </label>
                                     <div className="relative">
-                                        <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
-                                        <Input
-                                            type="text"
+                                        <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none z-10" />
+                                        <select
                                             name="department"
                                             value={formData.department}
                                             onChange={handleChange}
                                             required
-                                            placeholder="CSE"
-                                            className="pl-10 bg-slate-50 border-slate-200 focus:border-primary/50 text-slate-800 placeholder:text-slate-400"
-                                        />
+                                            className="w-full h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-md focus:border-primary/50 focus:ring-2 focus:ring-primary/20 text-slate-800 text-sm appearance-none cursor-pointer transition-colors hover:bg-slate-100"
+                                        >
+                                            <option value="" disabled>বিভাগ নির্বাচন করুন</option>
+                                            <option value="CST">CST - Computer Science Technology</option>
+                                            <option value="CT">CT - Civil Technology</option>
+                                            <option value="ET">ET - Electrical Technology</option>
+                                            <option value="TT">TT - Textile Technology</option>
+                                            <option value="Architecture">Architecture</option>
+                                        </select>
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
