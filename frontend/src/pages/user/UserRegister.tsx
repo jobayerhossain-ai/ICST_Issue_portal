@@ -153,8 +153,9 @@ const UserRegister = () => {
                                         <button
                                             type="button"
                                             onClick={() => setDeptOpen(prev => !prev)}
-                                            className={`w-full h-11 pl-10 pr-10 bg-white border rounded-xl text-sm text-left 
-                                                shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer flex items-center
+                                            className={`w-full h-11 px-3 bg-white border rounded-xl text-sm
+                                                shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer
+                                                flex items-center gap-2
                                                 ${deptOpen
                                                     ? 'border-primary ring-2 ring-primary/10 shadow-md'
                                                     : 'border-slate-200 hover:border-slate-300'
@@ -162,12 +163,12 @@ const UserRegister = () => {
                                                 ${selectedDept ? 'text-slate-800 font-medium' : 'text-slate-400'}
                                             `}
                                         >
-                                            <BookOpen className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${deptOpen ? 'text-primary' : 'text-slate-400'}`} />
-                                            <span className="truncate">
+                                            <BookOpen className={`w-4 h-4 shrink-0 transition-colors duration-200 ${deptOpen ? 'text-primary' : 'text-slate-400'}`} />
+                                            <span className="flex-1 truncate text-left">
                                                 {selectedDept ? selectedDept.label : 'বিভাগ নির্বাচন করুন'}
                                             </span>
                                             <motion.div
-                                                className="absolute right-3 top-1/2 -translate-y-1/2"
+                                                className="shrink-0 flex items-center"
                                                 animate={{ rotate: deptOpen ? 180 : 0 }}
                                                 transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
                                             >
