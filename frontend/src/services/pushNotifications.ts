@@ -57,7 +57,10 @@ export async function registerPushNotifications(): Promise<boolean> {
         // 2. Request notification permission
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
-            console.log('Notification permission denied');
+            console.log('Notification permission denied by user');
+            if (permission === 'denied') {
+                toast.error('নোটিফিকেশন পারমিশন মেলেনি। দয়া করে ব্রাউজার সেটিংস চেক করুন।');
+            }
             return false;
         }
 

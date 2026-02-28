@@ -1,11 +1,19 @@
 self.addEventListener('push', function (event) {
-    const data = event.data ? event.data.json() : {};
-    const title = data.title || 'New Notification';
+    let data = {};
+    try {
+        data = event.data ? event.data.json() : {};
+    } catch (e) {
+        console.error('Push data parse error:', e);
+    }
+
+    const title = data.title || 'আইসিএসটি পোর্টাল 📢';
     const options = {
-        body: data.body || 'You have a new update.',
-        icon: '/logo.png', // Fallback icon
+        body: data.body || 'আপনার জন্য নতুন একটি আপডেট আছে!',
+        icon: '/logo.png',
         badge: '/logo.png',
-        data: data.url || '/'
+        data: data.url || '/',
+        vibrate: [200, 100, 200],
+        tag: 'icst-notification'
     };
 
     event.waitUntil(

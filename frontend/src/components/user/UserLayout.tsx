@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import UserSidebar from './UserSidebar';
 import { Menu, X, Globe, ExternalLink } from 'lucide-react';
 import NotificationBell from './NotificationBell';
+import NotificationBanner from './NotificationBanner';
 
 const UserLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -126,6 +127,7 @@ const UserLayout = () => {
 
                 {/* Page Content — naturally scrollable */}
                 <main className="flex-1">
+                    <NotificationBanner />
                     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                         <Outlet />
                     </div>
