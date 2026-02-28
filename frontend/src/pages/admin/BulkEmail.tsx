@@ -12,6 +12,13 @@ const BulkEmail = () => {
     const [customEmails, setCustomEmails] = useState('');
     const [preview, setPreview] = useState(false);
     const [sending, setSending] = useState(false);
+    const [testingSmtp, setTestingSmtp] = useState(false);
+    const [smtpStatus, setSmtpStatus] = useState<{
+        success?: boolean;
+        message?: string;
+        diagnosis?: string;
+        lastChecked?: string;
+    } | null>(null);
 
     const handleSend = async () => {
         if (!subject || !body) {
@@ -65,6 +72,31 @@ const BulkEmail = () => {
         }
     };
 
+    const testConnection = async () => {
+        setTestingSmtp(true);
+        setSmtpStatus(null);
+        try {
+            const response = await api.post('/admin/test-email');
+            setSmtpStatus({
+                success: true,
+                message: response.data.message,
+                lastChecked: new Date().toLocaleTimeString()
+            });
+            toast.success('SMTP Connection Successful');
+        } catch (err: any) {
+            const errorData = err.response?.data;
+            setSmtpStatus({
+                success: false,
+                message: errorData?.error || 'Unknown Error',
+                diagnosis: errorData?.diagnosis,
+                lastChecked: new Date().toLocaleTimeString()
+            });
+            toast.error('SMTP Connection Failed');
+        } finally {
+            setTestingSmtp(false);
+        }
+    };
+
     const previewHTML = `
 <!DOCTYPE html>
 <html>
@@ -93,14 +125,58 @@ ${body || 'Email body will appear here...'}
                 className="mb-6"
             >
                 <h1 className="text-3xl font-bold text-gray-800">📧 Bulk Email System</h1>
-                <p className="text-gray-600 mt-1">সব users কে একসাথে email পাঠান</p>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-1">
+                    <p className="text-gray-600">সব users কে একসাথে email পাঠান</p>
+
+                    <div className="flex items-center gap-3">
+                        <div className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 border ${!smtpStatus ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                                smtpStatus.success ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'
+                            }`}>
+                            <div className={`w-2 h-2 rounded-full ${!smtpStatus ? 'bg-gray-400' :
+                                    smtpStatus.success ? 'bg-green-500' : 'bg-red-500'
+                                }`} />
+                            SMTP: {!smtpStatus ? 'Not Tested' : smtpStatus.success ? 'Connected' : 'Error'}
+                            {smtpStatus?.lastChecked && <span className="text-[10px] opacity-60 ml-1">at {smtpStatus.lastChecked}</span>}
+                        </div>
+
+                        <button
+                            onClick={testConnection}
+                            disabled={testingSmtp}
+                            className="text-xs font-medium text-sky-600 hover:text-sky-700 underline flex items-center gap-1 disabled:opacity-50"
+                        >
+                            {testingSmtp ? 'Testing...' : 'Test Connection'}
+                        </button>
+                    </div>
+                </div>
             </motion.div>
+
+            {smtpStatus && !smtpStatus.success && (
+                <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg"
+                >
+                    <div className="flex items-start">
+                        <div className="flex-1">
+                            <h3 className="text-sm font-bold text-red-800">SMTP Configuration Problem Detected</h3>
+                            <p className="text-xs text-red-700 mt-1"><strong>Error:</strong> {smtpStatus.message}</p>
+                            {smtpStatus.diagnosis && (
+                                <p className="text-xs text-red-600 mt-2 bg-white/50 p-2 rounded border border-red-100">
+                                    💡 <strong>Fix:</strong> {smtpStatus.diagnosis}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </motion.div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Compose Section */}
                 <Card>
                     <CardContent className="p-6">
-                        <h2 className="text-xl font-bold mb-4">Compose Email</h2>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-bold">Compose Email</h2>
+                        </div>
 
                         <div className="space-y-4">
                             {/* Recipients */}

@@ -2,19 +2,29 @@ const nodemailer = require('nodemailer');
 
 // Keep a singleton transporter instance to reuse connections
 let transporterInstance = null;
+let lastConfigHash = null; // To detect when db settings change
 
-const createTransporter = () => {
-    // If instance already exists, return it
-    if (transporterInstance) return transporterInstance;
+const createTransporter = (dbConfig = null) => {
+    // Build a hash from the current config to detect changes
+    const currentHash = dbConfig
+        ? `${dbConfig.emailHost}:${dbConfig.emailPort}:${dbConfig.emailUser}:${dbConfig.emailSecure}`
+        : 'env';
+
+    // If instance already exists and config hasn't changed, return it
+    if (transporterInstance && lastConfigHash === currentHash) return transporterInstance;
+
+    // Config is sourced from DB first, then falls back to .env
+    const host = (dbConfig && dbConfig.emailHost) || process.env.EMAIL_HOST || 'smtp.gmail.com';
+    const port = (dbConfig && dbConfig.emailPort) || parseInt(process.env.EMAIL_PORT || '587');
+    const secure = (dbConfig && dbConfig.emailSecure != null) ? dbConfig.emailSecure : (process.env.EMAIL_SECURE === 'true');
+    const user = (dbConfig && dbConfig.emailUser) || process.env.EMAIL_USER;
+    const pass = (dbConfig && dbConfig.emailPassword) || process.env.EMAIL_PASSWORD;
 
     const config = {
-        host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.EMAIL_PORT || '587'),
-        secure: process.env.EMAIL_SECURE === 'true',
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASSWORD
-        },
+        host,
+        port,
+        secure,
+        auth: { user, pass },
         pool: true, // Use SMTP connection pooling
         maxConnections: 5,
         maxMessages: 100,
@@ -29,10 +39,41 @@ const createTransporter = () => {
         debug: process.env.EMAIL_DEBUG === 'true'
     };
 
-    console.log(`📡 Creating new SMTP transporter for ${config.host}:${config.port}`);
+    console.log(`📡 Creating new SMTP transporter for ${config.host}:${config.port} (source: ${dbConfig ? 'database' : '.env'})`);
     transporterInstance = nodemailer.createTransport(config);
+
+    // Track connection state and config hash
+    transporterInstance.verified = false;
+    lastConfigHash = currentHash;
+
     return transporterInstance;
 };
+
+// ★ Helper: Fetch latest SMTP config from DB (used at send-time)
+// This is a lazy-load: it only imports the db to avoid circular deps.
+let _db = null;
+let _systemConfig = null;
+const getDbEmailConfig = async () => {
+    try {
+        if (!_db) {
+            const { neon } = require('@neondatabase/serverless');
+            const { drizzle } = require('drizzle-orm/neon-http');
+            const schema = require('./schema');
+            const sqlClient = neon(process.env.DATABASE_URL);
+            _db = drizzle(sqlClient, { schema });
+            _systemConfig = schema.systemConfig;
+        }
+        const rows = await _db.select().from(_systemConfig).limit(1);
+        if (rows.length > 0 && rows[0].emailHost) {
+            return rows[0]; // Has DB config
+        }
+        return null; // Fall back to .env
+    } catch (err) {
+        console.warn('⚠️ Could not fetch DB email config, falling back to .env:', err.message);
+        return null;
+    }
+};
+
 
 // Email Templates
 const emailTemplates = {
@@ -250,13 +291,19 @@ ${body}
 // Send Email Function
 const sendEmail = async (to, template, data) => {
     try {
-        // Check if email is configured
-        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+        // Fetch latest config from DB (falls back to .env automatically in createTransporter)
+        const dbConfig = await getDbEmailConfig();
+
+        // Check if email credentials exist (DB or .env)
+        const user = (dbConfig && dbConfig.emailUser) || process.env.EMAIL_USER;
+        const pass = (dbConfig && dbConfig.emailPassword) || process.env.EMAIL_PASSWORD;
+        if (!user || !pass) {
             console.warn('⚠️ Email not configured. Skipping email send.');
             return { success: false, message: 'Email not configured' };
         }
 
-        const transporter = createTransporter();
+        const transporter = createTransporter(dbConfig);
+        const fromName = (dbConfig && dbConfig.emailFromName) || 'ICST Issue Portal';
 
         // Verify connection once on first use
         if (!transporterInstance.verified) {
@@ -288,12 +335,12 @@ const sendEmail = async (to, template, data) => {
         }
 
         const mailOptions = {
-            from: `"ICST Issue Portal" <${process.env.EMAIL_USER}>`,
+            from: `"${fromName}" <${user}>`,
             to,
             subject,
             html,
             envelope: {
-                from: process.env.EMAIL_USER, // Enforce strict envelope from
+                from: user,
                 to: to
             }
         };
@@ -303,14 +350,20 @@ const sendEmail = async (to, template, data) => {
         return { success: true, messageId: info.messageId };
     } catch (error) {
         console.error(`❌ SMTP Error for ${to}:`, error.message);
+
+        // Reset verified state on connection-related errors
+        if (transporterInstance && (error.code === 'ETIMEDOUT' || error.code === 'ECONNRESET' || error.code === 'EAUTH')) {
+            transporterInstance.verified = false;
+        }
+
         if (error.code === 'EAUTH') {
-            console.error('Check your EMAIL_USER and EMAIL_PASSWORD in .env');
+            console.error('Check your email credentials in Admin Panel > Email Settings or .env');
         }
         return { success: false, error: error.message };
     }
 };
 
-// Send Bulk Emails
+// Send Bulk Emails (Parallel Batch Processing)
 const sendBulkEmails = async (recipients, template, data) => {
     const results = {
         total: recipients.length,
@@ -319,17 +372,31 @@ const sendBulkEmails = async (recipients, template, data) => {
         errors: []
     };
 
-    for (const recipient of recipients) {
-        const result = await sendEmail(recipient, template, data);
-        if (result.success) {
-            results.sent++;
-        } else {
-            results.failed++;
-            results.errors.push({ email: recipient, error: result.error });
-        }
+    // Use concurrency to avoid blocking but also avoid hitting SMTP rate limits too hard
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+        const batch = recipients.slice(i, i + BATCH_SIZE);
 
-        // Add small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
+        const batchPromises = batch.map(recipient => sendEmail(recipient, template, data));
+        const batchResults = await Promise.allSettled(batchPromises);
+
+        batchResults.forEach((res, index) => {
+            if (res.status === 'fulfilled' && res.value.success) {
+                results.sent++;
+            } else {
+                results.failed++;
+                const errorMsg = res.status === 'fulfilled' ? res.value.error : res.reason.message;
+                results.errors.push({
+                    email: batch[index],
+                    error: errorMsg
+                });
+            }
+        });
+
+        // Small cooling delay between batches
+        if (i + BATCH_SIZE < recipients.length) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
     }
 
     return results;
@@ -338,5 +405,6 @@ const sendBulkEmails = async (recipients, template, data) => {
 module.exports = {
     sendEmail,
     sendBulkEmails,
-    emailTemplates
+    emailTemplates,
+    getDbEmailConfig
 };

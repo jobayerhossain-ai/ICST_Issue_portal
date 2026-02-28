@@ -41,6 +41,7 @@ const AuditLogs = React.lazy(() => import("./pages/admin/AuditLogs"));
 const SystemConfig = React.lazy(() => import("./pages/admin/SystemConfig"));
 const ReportsAnalytics = React.lazy(() => import("./pages/admin/ReportsAnalytics"));
 const KnowledgeBase = React.lazy(() => import("./pages/admin/KnowledgeBase"));
+const EmailSettings = React.lazy(() => import("./pages/admin/EmailSettings"));
 
 const UserRegister = React.lazy(() => import("./pages/user/UserRegister"));
 const UserLogin = React.lazy(() => import("./pages/user/UserLogin"));
@@ -195,6 +196,7 @@ const App = () => (
                   <Route path="config" element={<SystemConfig />} />
                   <Route path="audit" element={<AuditLogs />} />
                   <Route path="kb" element={<KnowledgeBase />} />
+                  <Route path="email-settings" element={<EmailSettings />} />
 
                 </Route>
 

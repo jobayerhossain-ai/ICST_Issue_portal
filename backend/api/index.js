@@ -140,6 +140,24 @@ const canSendMessage = (user) => {
     }
 })();
 
+// ★ AUTO-MIGRATE: Add email config columns to system_config if they don't exist
+(async () => {
+    try {
+        await sqlClient(`
+            ALTER TABLE system_config
+            ADD COLUMN IF NOT EXISTS email_host TEXT,
+            ADD COLUMN IF NOT EXISTS email_port INTEGER,
+            ADD COLUMN IF NOT EXISTS email_secure BOOLEAN DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS email_user TEXT,
+            ADD COLUMN IF NOT EXISTS email_password TEXT,
+            ADD COLUMN IF NOT EXISTS email_from_name TEXT DEFAULT 'ICST Issue Portal'
+        `);
+        console.log('✅ system_config email columns ready');
+    } catch (err) {
+        console.log('system_config migration check:', err.message);
+    }
+})();
+
 // ★ PUSH NOTIFICATION HELPER — sends push to all of a user's subscribed devices
 async function sendPushToUser(userId, payload) {
     try {
@@ -1881,25 +1899,33 @@ app.post('/api/admin/test-email', authenticateToken, requireAdmin, async (req, r
 
         const result = await sendEmail(testRecipient, 'welcome', [req.user.name]);
 
+        const smtpInfo = {
+            host: process.env.EMAIL_HOST,
+            port: process.env.EMAIL_PORT,
+            user: process.env.EMAIL_USER,
+            secure: process.env.EMAIL_SECURE
+        };
+
         if (result.success) {
             res.json({
                 success: true,
                 message: `Test email sent successfully to ${testRecipient}`,
                 messageId: result.messageId,
-                note: 'Please check your inbox (and spam folder).'
+                config: smtpInfo
             });
         } else {
+            // Provide a clearer diagnosis based on error message
+            let diagnosis = "This error usually happens due to wrong credentials or SMTP server restrictions.";
+            if (result.error.includes('ETIMEDOUT')) diagnosis = "Connection timed out. Check if SMTP Host and Port are correct, or if your server firewall is blocking outbound mail.";
+            if (result.error.includes('EAUTH')) diagnosis = "Authentication failed. Please verify your EMAIL_USER and ensure you are using a correct App Password (not your regular Gmail password).";
+            if (result.error.includes('ECONNREFUSED')) diagnosis = "Connection refused. The SMTP server is not responding on this port.";
+
             res.status(500).json({
                 success: false,
                 message: 'SMTP Test Failed',
                 error: result.error,
-                diagnosis: 'This error usually happens due to wrong credentials or SMTP server restrictions.',
-                config: {
-                    host: process.env.EMAIL_HOST,
-                    port: process.env.EMAIL_PORT,
-                    user: process.env.EMAIL_USER,
-                    secure: process.env.EMAIL_SECURE
-                }
+                diagnosis,
+                config: smtpInfo
             });
         }
     } catch (err) {

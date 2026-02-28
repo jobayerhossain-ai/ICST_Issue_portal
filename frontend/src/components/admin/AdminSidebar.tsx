@@ -11,7 +11,8 @@ import {
   Settings,
   BookOpen,
   BarChart,
-  Lock
+  Lock,
+  Mail
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -40,6 +41,7 @@ const menuItems = [
   { title: 'Emergency Control', url: '/admin/emergency', icon: Lock },
   // Placeholders for future features
   { title: 'Reports & Analytics', url: '/admin/reports', icon: BarChart },
+  { title: 'Email Settings', url: '/admin/email-settings', icon: Mail },
   { title: 'System Config', url: '/admin/config', icon: Settings },
   { title: 'Audit Logs', url: '/admin/audit', icon: FileText },
   { title: 'Knowledge Base', url: '/admin/kb', icon: BookOpen },

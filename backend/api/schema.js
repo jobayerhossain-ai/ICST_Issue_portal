@@ -63,7 +63,14 @@ const systemConfig = pgTable("system_config", {
     priorities: json("priorities").default([]),
     maintenanceMode: boolean("maintenance_mode").default(false),
     allowRegistration: boolean("allow_registration").default(true),
-    slaRules: json("sla_rules").default({})
+    slaRules: json("sla_rules").default({}),
+    // Email / SMTP Settings (stored in DB so admin can change without redeploying)
+    emailHost: text("email_host"),
+    emailPort: integer("email_port"),
+    emailSecure: boolean("email_secure").default(false),
+    emailUser: text("email_user"),
+    emailPassword: text("email_password"),
+    emailFromName: text("email_from_name").default("ICST Issue Portal")
 });
 
 const articles = pgTable("articles", {
