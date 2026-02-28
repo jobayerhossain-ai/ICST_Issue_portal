@@ -43,12 +43,14 @@ const EmailSettings = () => {
             const { data } = await api.get('/admin/system-config');
             if (data) {
                 setConfig({
+                    resendApiKey: data.resendApiKey || '',
+                    emailFrom: data.emailFrom || 'noreply@devorica.com',
+                    emailFromName: data.emailFromName || 'ICST Issue Portal',
                     emailHost: data.emailHost || '',
                     emailPort: data.emailPort || 587,
                     emailSecure: data.emailSecure ?? false,
                     emailUser: data.emailUser || '',
                     emailPassword: data.emailPassword || '',
-                    emailFromName: data.emailFromName || 'ICST Issue Portal',
                 });
                 setLoaded(true);
             }

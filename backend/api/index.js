@@ -1894,47 +1894,50 @@ app.get('/api/admin/all-users', authenticateToken, requireAdmin, async (req, res
 // ★ ADMIN: Test Email Configuration
 app.post('/api/admin/test-email', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { email } = req.body;
-        const testRecipient = email || req.user.email;
+        const { email, testRecipient } = req.body;
+        const recipient = email || testRecipient || req.user.email;
 
-        console.log(`📧 Starting SMTP diagnostic test for ${testRecipient}...`);
+        console.log(`📧 Testing email delivery to ${recipient}...`);
 
-        const result = await sendEmail(testRecipient, 'welcome', [req.user.name]);
+        const result = await sendEmail(recipient, 'welcome', [req.user.name || 'Admin']);
 
-        const smtpInfo = {
-            host: process.env.EMAIL_HOST,
-            port: process.env.EMAIL_PORT,
-            user: process.env.EMAIL_USER,
-            secure: process.env.EMAIL_SECURE
+        // Determine what provider was used
+        const resendKey = process.env.RESEND_API_KEY;
+        const providerInfo = {
+            provider: resendKey ? 'Resend (API)' : 'SMTP',
+            from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+            fromName: process.env.EMAIL_FROM_NAME || 'ICST Issue Portal'
         };
 
         if (result.success) {
             res.json({
                 success: true,
-                message: `Test email sent successfully to ${testRecipient}`,
+                message: `Test email sent successfully to ${recipient}`,
                 messageId: result.messageId,
-                config: smtpInfo
+                config: providerInfo
             });
         } else {
-            // Provide a clearer diagnosis based on error message
-            let diagnosis = "This error usually happens due to wrong credentials or SMTP server restrictions.";
-            if (result.error.includes('ETIMEDOUT')) diagnosis = "Connection timed out. Check if SMTP Host and Port are correct, or if your server firewall is blocking outbound mail.";
-            if (result.error.includes('EAUTH')) diagnosis = "Authentication failed. Please verify your EMAIL_USER and ensure you are using a correct App Password (not your regular Gmail password).";
-            if (result.error.includes('ECONNREFUSED')) diagnosis = "Connection refused. The SMTP server is not responding on this port.";
+            let diagnosis = 'Email delivery failed.';
+            const err = result.error || '';
+            if (err.includes('ETIMEDOUT') || err.includes('timeout')) diagnosis = 'Connection timed out. SMTP ports may be blocked (use Resend instead).';
+            else if (err.includes('EAUTH') || err.includes('auth')) diagnosis = 'Authentication failed. Check your API key or email credentials.';
+            else if (err.includes('domain') || err.includes('sender')) diagnosis = 'Sender domain not verified. Verify your domain in Resend dashboard.';
+            else if (err.includes('API key')) diagnosis = 'Invalid Resend API key. Check your key in Admin → Email Settings.';
 
             res.status(500).json({
                 success: false,
-                message: 'SMTP Test Failed',
+                message: 'Email Test Failed',
                 error: result.error,
                 diagnosis,
-                config: smtpInfo
+                config: providerInfo
             });
         }
     } catch (err) {
-        console.error('SMTP Diagnostic Error:', err);
-        res.status(500).json({ message: 'Diagnostic route failed', error: err.message });
+        console.error('Email test error:', err);
+        res.status(500).json({ message: 'Test route failed', error: err.message });
     }
 });
+
 
 // ★ ADMIN: Send custom email
 app.post('/api/admin/send-email', authenticateToken, requireAdmin, async (req, res) => {
