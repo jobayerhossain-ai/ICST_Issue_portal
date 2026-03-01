@@ -105,14 +105,14 @@ const About = () => {
               <p className="text-sm text-muted-foreground">সমস্যা রিপোর্ট করুন বিস্তারিত তথ্য সহ</p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-secondary/20 border-2 border-secondary flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-secondary">
+              <div className="w-16 h-16 rounded-full bg-blue-100 border-2 border-blue-500 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-blue-600">
                 2
               </div>
               <h4 className="font-semibold text-foreground mb-2">ভোট</h4>
               <p className="text-sm text-muted-foreground">গুরুত্বপূর্ণ সমস্যায় ভোট দিয়ে সমর্থন করুন</p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-accent/20 border-2 border-accent flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-accent">
+              <div className="w-16 h-16 rounded-full bg-orange-100 border-2 border-orange-500 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-orange-600">
                 3
               </div>
               <h4 className="font-semibold text-foreground mb-2">ট্র্যাক</h4>
