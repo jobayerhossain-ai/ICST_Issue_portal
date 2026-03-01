@@ -125,30 +125,27 @@ const canSendMessage = (user) => {
 
 // --- ROUTES ---
 
-const dbInitializationPromise = (async () => {
-    if (!process.env.DATABASE_URL) {
-        console.error('❌ [DB INIT] DATABASE_URL missing');
-        throw new Error('DATABASE_URL missing');
-    }
 
+// --- ADMIN DATABASE INITIALIZATION ROUTE ---
+// Manually run this once after deploying to set up tables. 
+// Removed from cold start to prevent Vercel 504 Gateway Timeouts (the "hanging" issue).
+app.get('/api/admin/system/init-database', async (req, res) => {
+    if (!process.env.DATABASE_URL) {
+        return res.status(500).json({ error: 'DATABASE_URL missing' });
+    }
+    
     const runQuery = async (name, query) => {
         const start = Date.now();
         console.log(`⏳ [DB INIT] ${name}...`);
-        try {
-            await sqlClient(query);
-            console.log(`✅ [DB INIT] ${name} (${Date.now() - start}ms)`);
-        } catch (err) {
-            console.error(`❌ [DB INIT] ${name} FAILED:`, err.message);
-            // We throw here for critical core tables
-            if (name.includes('users') || name.includes('extension')) throw err;
-        }
+        await sqlClient(query);
+        console.log(`✅ [DB INIT] ${name} (${Date.now() - start}ms)`);
     };
 
     try {
-        console.log('🚀 [DB INIT] Starting Sequential Initialization');
-
+        console.log('🚀 [DB INIT] Starting Manual Initialization');
+        
         await runQuery('pgcrypto extension', 'CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
-
+        
         await runQuery('users table', `CREATE TABLE IF NOT EXISTS users (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name TEXT NOT NULL,
@@ -235,38 +232,13 @@ const dbInitializationPromise = (async () => {
         }
 
         console.log('✅ [DB INIT] All initialization steps complete');
-        return true;
+        res.json({ success: true, message: 'Database successfully initialized.' });
     } catch (err) {
-        console.error('❌ [DB INIT] DATABASE INITIALIZATION FAILED CRITICALLY:', err.message);
-        throw err;
+        console.error('❌ [DB INIT] DATABASE INITIALIZATION FAILED:', err.message);
+        res.status(500).json({ error: err.message });
     }
-})();
+});
 
-// Re-evaluate the timeout promise per-request or make it more robust
-const ensureDbReady = async (req, res, next) => {
-    console.log(`[REQ] ${req.method} ${req.url} - Checking DB readiness...`);
-    const requestStart = Date.now();
-
-    try {
-        // We use a fresh timeout for each request to avoid the "constant rejection" trap
-        await Promise.race([
-            dbInitializationPromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('DB Init Timeout (45s)')), 45000))
-        ]);
-
-        console.log(`[REQ] DB ready after ${Date.now() - requestStart}ms`);
-        next();
-    } catch (err) {
-        console.error(`[REQ] DB readiness check failed:`, err.message);
-        res.status(503).json({
-            message: 'Server is starting up. Please try again in 30 seconds.',
-            error: err.message
-        });
-    }
-};
-
-// Apply ensureDbReady to all /api routes
-app.use('/api', ensureDbReady);
 
 // ★ PUSH NOTIFICATION HELPER — sends push to all of a user's subscribed devices
 async function sendPushToUser(userId, payload) {
