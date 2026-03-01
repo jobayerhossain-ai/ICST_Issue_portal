@@ -124,9 +124,76 @@ const canSendMessage = (user) => {
 
 // --- ROUTES ---
 
-// ★ AUTO-CREATE push_subscriptions table on startup
+// --- DATABASE SCHEMA INITIALIZATION ---
+// This ensures all tables exist on startup (Crucial for Neon Serverless/Fresh Deployments)
 (async () => {
     try {
+        // 1. Users table (Base table)
+        await sqlClient(`CREATE TABLE IF NOT EXISTS users (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            role TEXT DEFAULT 'user',
+            department TEXT,
+            roll TEXT,
+            is_blocked BOOLEAN DEFAULT false,
+            created_at TIMESTAMP DEFAULT NOW()
+        )`);
+
+        // 2. System Config (Settings)
+        await sqlClient(`CREATE TABLE IF NOT EXISTS system_config (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            categories JSONB DEFAULT '[]',
+            priorities JSONB DEFAULT '[]',
+            maintenance_mode BOOLEAN DEFAULT false,
+            allow_registration BOOLEAN DEFAULT true,
+            sla_rules JSONB DEFAULT '{}',
+            email_host TEXT,
+            email_port INTEGER,
+            email_secure BOOLEAN DEFAULT false,
+            email_user TEXT,
+            email_password TEXT,
+            email_from_name TEXT DEFAULT 'ICST Issue Portal',
+            resend_api_key TEXT,
+            email_from TEXT DEFAULT 'onboarding@resend.dev'
+        )`);
+
+        // Seed default config if none exists
+        const configCount = await sqlClient(`SELECT count(*) FROM system_config`);
+        if (parseInt(configCount[0].count) === 0) {
+            await sqlClient(`INSERT INTO system_config (allow_registration) VALUES (true)`);
+            console.log('🌱 Seeded default system_config');
+        }
+
+        // 3. Issues table
+        await sqlClient(`CREATE TABLE IF NOT EXISTS issues (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            category TEXT NOT NULL,
+            priority TEXT DEFAULT 'medium',
+            status TEXT DEFAULT 'pending',
+            votes_good INTEGER DEFAULT 0,
+            votes_bad INTEGER DEFAULT 0,
+            submitted_by UUID REFERENCES users(id),
+            views INTEGER DEFAULT 0,
+            image_url TEXT,
+            expected_resolution TIMESTAMP,
+            assigned_to UUID REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )`);
+
+        // 4. Issue Voted Users (Many-to-Many join)
+        await sqlClient(`CREATE TABLE IF NOT EXISTS issue_voted_users (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            issue_id UUID REFERENCES issues(id),
+            user_id UUID REFERENCES users(id),
+            type TEXT NOT NULL DEFAULT 'good'
+        )`);
+
+        // 5. Push Subscriptions
         await sqlClient(`CREATE TABLE IF NOT EXISTS push_subscriptions (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id UUID NOT NULL REFERENCES users(id),
@@ -134,29 +201,22 @@ const canSendMessage = (user) => {
             keys JSONB NOT NULL,
             created_at TIMESTAMP DEFAULT NOW()
         )`);
-        console.log('✅ push_subscriptions table ready');
-    } catch (err) {
-        console.log('push_subscriptions table check:', err.message);
-    }
-})();
 
-// ★ AUTO-MIGRATE: Add email config columns to system_config if they don't exist
-(async () => {
-    try {
-        await sqlClient(`
-            ALTER TABLE system_config
-            ADD COLUMN IF NOT EXISTS email_host TEXT,
-            ADD COLUMN IF NOT EXISTS email_port INTEGER,
-            ADD COLUMN IF NOT EXISTS email_secure BOOLEAN DEFAULT FALSE,
-            ADD COLUMN IF NOT EXISTS email_user TEXT,
-            ADD COLUMN IF NOT EXISTS email_password TEXT,
-            ADD COLUMN IF NOT EXISTS email_from_name TEXT DEFAULT 'ICST Issue Portal',
-            ADD COLUMN IF NOT EXISTS resend_api_key TEXT,
-            ADD COLUMN IF NOT EXISTS email_from TEXT DEFAULT 'onboarding@resend.dev'
-        `);
-        console.log('✅ system_config email columns ready');
+        // 6. Audit Logs
+        await sqlClient(`CREATE TABLE IF NOT EXISTS audit_logs (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            admin_id UUID REFERENCES users(id),
+            target_id TEXT,
+            target_type TEXT,
+            action TEXT,
+            details TEXT,
+            ip TEXT,
+            timestamp TIMESTAMP DEFAULT NOW()
+        )`);
+
+        console.log('✅ Database Schema verified and tables ready');
     } catch (err) {
-        console.log('system_config migration check:', err.message);
+        console.error('❌ Database Initialization Error:', err.message);
     }
 })();
 
@@ -380,6 +440,7 @@ app.post('/api/auth/register', async (req, res) => {
 
         res.status(201).json({ token, _id: newUser.id, ...newUser });
     } catch (err) {
+        console.error('Registration Error:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });
