@@ -119,7 +119,7 @@ const Index = () => {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center gap-3 mb-8"
         >
-          <TrendingUp className="text-secondary" size={32} />
+          <TrendingUp className="text-primary" size={32} />
           <div>
             <h2 className="text-3xl md:text-4xl font-bold text-slate-800">
               এই সপ্তাহের ট্রেন্ডিং
