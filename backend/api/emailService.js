@@ -7,8 +7,16 @@ const nodemailer = require('nodemailer'); // SMTP fallback for local dev
 // ============================================================
 
 // ★ Helper: Fetch latest config from DB (lazy-loaded to avoid circular deps)
+// ★ Helper: Fetch latest config from DB (lazy-loaded to avoid circular deps)
 let _db = null;
 let _systemConfig = null;
+
+// Allow main app to inject its DB to share connection
+const setSharedDb = (db, configTable) => {
+    _db = db;
+    _systemConfig = configTable;
+};
+
 const getDbEmailConfig = async () => {
     try {
         if (!_db) {
@@ -361,6 +369,7 @@ const sendBulkEmails = async (recipients, template, data) => {
 };
 
 module.exports = {
+    setSharedDb,
     sendEmail,
     sendBulkEmails,
     emailTemplates,

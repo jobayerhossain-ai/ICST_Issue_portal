@@ -25,7 +25,8 @@ webpush.setVapidDetails('mailto:jovayerhossain0@gmail.com', VAPID_PUBLIC_KEY, VA
 const sqlClient = neon(process.env.DATABASE_URL);
 const db = drizzle(sqlClient, { schema });
 
-const { sendEmail, sendBulkEmails, emailTemplates } = require('./emailService');
+const { sendEmail, sendBulkEmails, emailTemplates, setSharedDb } = require('./emailService');
+setSharedDb(db, systemConfig);
 
 const app = express();
 app.use(compression());
@@ -124,47 +125,94 @@ const canSendMessage = (user) => {
 
 // --- ROUTES ---
 
-// --- DATABASE SCHEMA INITIALIZATION ---
-// This ensures all tables exist on startup and prevents race conditions in serverless environments.
 const dbInitializationPromise = (async () => {
     if (!process.env.DATABASE_URL) {
-        console.error('❌ DATABASE_URL is not defined in environment variables');
+        console.error('❌ DATABASE_URL missing');
         throw new Error('DATABASE_URL missing');
     }
     try {
-        // 0. Ensure pgcrypto extension exists for gen_random_uuid()
-        await sqlClient(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+        console.log('⏳ Verifying Database Schema (Batch)...');
+        // Combined batch execution for maximum performance in serverless cold starts
+        await sqlClient(`
+            CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
-        // 1. Users table (Base table)
-        await sqlClient(`CREATE TABLE IF NOT EXISTS users (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            role TEXT DEFAULT 'user',
-            department TEXT,
-            roll TEXT,
-            is_blocked BOOLEAN DEFAULT false,
-            created_at TIMESTAMP DEFAULT NOW()
-        )`);
+            CREATE TABLE IF NOT EXISTS users (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                password TEXT NOT NULL,
+                role TEXT DEFAULT 'user',
+                department TEXT,
+                roll TEXT,
+                is_blocked BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
 
-        // 2. System Config (Settings)
-        await sqlClient(`CREATE TABLE IF NOT EXISTS system_config (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            categories JSONB DEFAULT '[]',
-            priorities JSONB DEFAULT '[]',
-            maintenance_mode BOOLEAN DEFAULT false,
-            allow_registration BOOLEAN DEFAULT true,
-            sla_rules JSONB DEFAULT '{}',
-            email_host TEXT,
-            email_port INTEGER,
-            email_secure BOOLEAN DEFAULT false,
-            email_user TEXT,
-            email_password TEXT,
-            email_from_name TEXT DEFAULT 'ICST Issue Portal',
-            resend_api_key TEXT,
-            email_from TEXT DEFAULT 'onboarding@resend.dev'
-        )`);
+            CREATE TABLE IF NOT EXISTS system_config (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                categories JSONB DEFAULT '[]',
+                priorities JSONB DEFAULT '[]',
+                maintenance_mode BOOLEAN DEFAULT false,
+                allow_registration BOOLEAN DEFAULT true,
+                sla_rules JSONB DEFAULT '{}',
+                email_host TEXT,
+                email_port INTEGER,
+                email_secure BOOLEAN DEFAULT false,
+                email_user TEXT,
+                email_password TEXT,
+                email_from_name TEXT DEFAULT 'ICST Issue Portal',
+                resend_api_key TEXT,
+                email_from TEXT DEFAULT 'onboarding@resend.dev'
+            );
+
+            CREATE TABLE IF NOT EXISTS issues (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                category TEXT NOT NULL,
+                priority TEXT DEFAULT 'medium',
+                status TEXT DEFAULT 'pending',
+                votes_good INTEGER DEFAULT 0,
+                votes_bad INTEGER DEFAULT 0,
+                submitted_by UUID REFERENCES users(id),
+                views INTEGER DEFAULT 0,
+                image_url TEXT,
+                location TEXT,
+                contact_email TEXT,
+                expected_resolution TIMESTAMP,
+                assigned_to UUID REFERENCES users(id),
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+
+            ALTER TABLE issues ADD COLUMN IF NOT EXISTS location TEXT, ADD COLUMN IF NOT EXISTS contact_email TEXT;
+
+            CREATE TABLE IF NOT EXISTS issue_voted_users (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                issue_id UUID REFERENCES issues(id),
+                user_id UUID REFERENCES users(id),
+                type TEXT NOT NULL DEFAULT 'good'
+            );
+
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL REFERENCES users(id),
+                endpoint TEXT NOT NULL,
+                keys JSONB NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                admin_id UUID REFERENCES users(id),
+                target_id TEXT,
+                target_type TEXT,
+                action TEXT,
+                details TEXT,
+                ip TEXT,
+                timestamp TIMESTAMP DEFAULT NOW()
+            );
+        `);
 
         // Seed default config if none exists
         const configCount = await sqlClient(`SELECT count(*) FROM system_config`);
@@ -173,70 +221,23 @@ const dbInitializationPromise = (async () => {
             console.log('🌱 Seeded default system_config');
         }
 
-        // 3. Issues table
-        await sqlClient(`CREATE TABLE IF NOT EXISTS issues (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            title TEXT NOT NULL,
-            description TEXT NOT NULL,
-            category TEXT NOT NULL,
-            priority TEXT DEFAULT 'medium',
-            status TEXT DEFAULT 'pending',
-            votes_good INTEGER DEFAULT 0,
-            votes_bad INTEGER DEFAULT 0,
-            submitted_by UUID REFERENCES users(id),
-            views INTEGER DEFAULT 0,
-            image_url TEXT,
-            location TEXT,
-            contact_email TEXT,
-            expected_resolution TIMESTAMP,
-            assigned_to UUID REFERENCES users(id),
-            created_at TIMESTAMP DEFAULT NOW(),
-            updated_at TIMESTAMP DEFAULT NOW()
-        )`);
-
-        // Migration: ensure location and contact_email exist if table was already there
-        await sqlClient(`ALTER TABLE issues ADD COLUMN IF NOT EXISTS location TEXT, ADD COLUMN IF NOT EXISTS contact_email TEXT`);
-
-        // 4. Issue Voted Users (Many-to-Many join)
-        await sqlClient(`CREATE TABLE IF NOT EXISTS issue_voted_users (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            issue_id UUID REFERENCES issues(id),
-            user_id UUID REFERENCES users(id),
-            type TEXT NOT NULL DEFAULT 'good'
-        )`);
-
-        // 5. Push Subscriptions
-        await sqlClient(`CREATE TABLE IF NOT EXISTS push_subscriptions (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID NOT NULL REFERENCES users(id),
-            endpoint TEXT NOT NULL,
-            keys JSONB NOT NULL,
-            created_at TIMESTAMP DEFAULT NOW()
-        )`);
-
-        // 6. Audit Logs
-        await sqlClient(`CREATE TABLE IF NOT EXISTS audit_logs (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            admin_id UUID REFERENCES users(id),
-            target_id TEXT,
-            target_type TEXT,
-            action TEXT,
-            details TEXT,
-            ip TEXT,
-            timestamp TIMESTAMP DEFAULT NOW()
-        )`);
-
-        console.log('✅ Database Schema verified and tables ready');
+        console.log('✅ Database Schema verified successfully');
     } catch (err) {
         console.error('❌ Database Initialization Error:', err.message);
-        throw err; // Re-throw so the promise stays rejected
+        throw err;
     }
 })();
+
+// Safety Timeout for Initialization (Prevent indefinite hang)
+const initializationWithTimeout = Promise.race([
+    dbInitializationPromise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Database initialization timed out after 45s')), 45000))
+]);
 
 // Middleware to ensure DB is ready before any request
 const ensureDbReady = async (req, res, next) => {
     try {
-        await dbInitializationPromise;
+        await initializationWithTimeout;
         next();
     } catch (err) {
         console.error('CRITICAL: Request failed because DB initialization failed:', err.message);
