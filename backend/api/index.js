@@ -131,11 +131,11 @@ const dbInitializationPromise = (async () => {
         throw new Error('DATABASE_URL missing');
     }
     try {
-        console.log('⏳ Verifying Database Schema (Batch)...');
-        // Combined batch execution for maximum performance in serverless cold starts
+        console.log('⏳ [DB INIT] Starting batch initialization...');
+        const startTime = Date.now();
+
         await sqlClient(`
             CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
             CREATE TABLE IF NOT EXISTS users (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 name TEXT NOT NULL,
@@ -147,7 +147,6 @@ const dbInitializationPromise = (async () => {
                 is_blocked BOOLEAN DEFAULT false,
                 created_at TIMESTAMP DEFAULT NOW()
             );
-
             CREATE TABLE IF NOT EXISTS system_config (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 categories JSONB DEFAULT '[]',
@@ -164,7 +163,6 @@ const dbInitializationPromise = (async () => {
                 resend_api_key TEXT,
                 email_from TEXT DEFAULT 'onboarding@resend.dev'
             );
-
             CREATE TABLE IF NOT EXISTS issues (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 title TEXT NOT NULL,
@@ -184,16 +182,13 @@ const dbInitializationPromise = (async () => {
                 created_at TIMESTAMP DEFAULT NOW(),
                 updated_at TIMESTAMP DEFAULT NOW()
             );
-
             ALTER TABLE issues ADD COLUMN IF NOT EXISTS location TEXT, ADD COLUMN IF NOT EXISTS contact_email TEXT;
-
             CREATE TABLE IF NOT EXISTS issue_voted_users (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 issue_id UUID REFERENCES issues(id),
                 user_id UUID REFERENCES users(id),
                 type TEXT NOT NULL DEFAULT 'good'
             );
-
             CREATE TABLE IF NOT EXISTS push_subscriptions (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id UUID NOT NULL REFERENCES users(id),
@@ -201,7 +196,6 @@ const dbInitializationPromise = (async () => {
                 keys JSONB NOT NULL,
                 created_at TIMESTAMP DEFAULT NOW()
             );
-
             CREATE TABLE IF NOT EXISTS audit_logs (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 admin_id UUID REFERENCES users(id),
@@ -214,35 +208,42 @@ const dbInitializationPromise = (async () => {
             );
         `);
 
+        console.log(`✅ [DB INIT] Batch completed in ${Date.now() - startTime}ms`);
+
         // Seed default config if none exists
+        console.log('⏳ [DB INIT] Checking system_config...');
         const configCount = await sqlClient(`SELECT count(*) FROM system_config`);
         if (parseInt(configCount[0].count) === 0) {
             await sqlClient(`INSERT INTO system_config (allow_registration) VALUES (true)`);
-            console.log('🌱 Seeded default system_config');
+            console.log('🌱 [DB INIT] Seeded default system_config');
         }
 
-        console.log('✅ Database Schema verified successfully');
+        console.log('✅ [DB INIT] Database Schema verified successfully');
+        return true;
     } catch (err) {
-        console.error('❌ Database Initialization Error:', err.message);
+        console.error('❌ [DB INIT] Database Initialization Error:', err.message);
         throw err;
     }
 })();
 
-// Safety Timeout for Initialization (Prevent indefinite hang)
-const initializationWithTimeout = Promise.race([
-    dbInitializationPromise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Database initialization timed out after 45s')), 45000))
-]);
-
-// Middleware to ensure DB is ready before any request
+// Re-evaluate the timeout promise per-request or make it more robust
 const ensureDbReady = async (req, res, next) => {
+    console.log(`[REQ] ${req.method} ${req.url} - Checking DB readiness...`);
+    const requestStart = Date.now();
+
     try {
-        await initializationWithTimeout;
+        // We use a fresh timeout for each request to avoid the "constant rejection" trap
+        await Promise.race([
+            dbInitializationPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('DB Init Timeout (45s)')), 45000))
+        ]);
+
+        console.log(`[REQ] DB ready after ${Date.now() - requestStart}ms`);
         next();
     } catch (err) {
-        console.error('CRITICAL: Request failed because DB initialization failed:', err.message);
-        res.status(500).json({
-            message: 'Database is starting up or failed to initialize. Please try again in a few seconds.',
+        console.error(`[REQ] DB readiness check failed:`, err.message);
+        res.status(503).json({
+            message: 'Server is starting up. Please try again in 30 seconds.',
             error: err.message
         });
     }
@@ -444,9 +445,13 @@ app.post('/api/auth/reset-password', async (req, res) => {
 const SALT_ROUNDS = 8; // Optimized for Vercel performance while maintaining security
 
 app.post('/api/auth/register', async (req, res) => {
+    console.log('[REG] Starting registration for:', req.body.email);
     try {
         // Check if registration is allowed
+        const configStartTime = Date.now();
         const config = await db.select().from(systemConfig).limit(1).then(r => r[0]);
+        console.log(`[REG] Config fetched in ${Date.now() - configStartTime}ms`);
+
         if (config && config.allowRegistration === false) {
             return res.status(403).json({
                 message: 'Registration is currently disabled. Please contact administrator.',
@@ -456,19 +461,29 @@ app.post('/api/auth/register', async (req, res) => {
 
         const { name, email, password, department, roll } = req.body;
 
+        const checkStartTime = Date.now();
         const existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1).then(r => r[0]);
+        console.log(`[REG] User check done in ${Date.now() - checkStartTime}ms`);
+
         if (existingUser) return res.status(400).json({ message: 'User exists' });
 
+        const hashStartTime = Date.now();
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+        console.log(`[REG] Password hashed in ${Date.now() - hashStartTime}ms`);
 
+        const insertStartTime = Date.now();
         const [newUser] = await db.insert(users).values({ name, email, password: hashedPassword, department, roll }).returning();
+        console.log(`[REG] User inserted in ${Date.now() - insertStartTime}ms`);
 
         const token = jwt.sign({ id: newUser.id, role: newUser.role }, 'secret_key', { expiresIn: '7d' });
 
         // Send welcome email (don't await to avoid blocking)
+        console.log('[REG] Sending welcome email...');
         sendEmail(email, emailTemplates.welcome, [name])
-            .catch(err => console.error('Failed to send welcome email:', err));
+            .then(() => console.log('[REG] Welcome email sent successfully'))
+            .catch(err => console.error('[REG] Failed to send welcome email:', err.message));
 
+        console.log('[REG] Registration complete for:', email);
         res.status(201).json({ token, _id: newUser.id, ...newUser });
     } catch (err) {
         console.error('Registration Error Detailed:', err);
