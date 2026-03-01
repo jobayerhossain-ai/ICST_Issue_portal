@@ -133,7 +133,7 @@ app.get('/api/admin/system/init-database', async (req, res) => {
     if (!process.env.DATABASE_URL) {
         return res.status(500).json({ error: 'DATABASE_URL missing' });
     }
-    
+
     const runQuery = async (name, query) => {
         const start = Date.now();
         console.log(`⏳ [DB INIT] ${name}...`);
@@ -143,9 +143,9 @@ app.get('/api/admin/system/init-database', async (req, res) => {
 
     try {
         console.log('🚀 [DB INIT] Starting Manual Initialization');
-        
+
         await runQuery('pgcrypto extension', 'CREATE EXTENSION IF NOT EXISTS "pgcrypto"');
-        
+
         await runQuery('users table', `CREATE TABLE IF NOT EXISTS users (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             name TEXT NOT NULL,
@@ -435,10 +435,20 @@ const SALT_ROUNDS = 8; // Optimized for Vercel performance while maintaining sec
 app.post('/api/auth/register', async (req, res) => {
     console.log('[REG] Starting registration for:', req.body.email);
     try {
-        // Check if registration is allowed
+        // Check if registration is allowed with a graceful fallback
         const configStartTime = Date.now();
-        const config = await db.select().from(systemConfig).limit(1).then(r => r[0]);
-        console.log(`[REG] Config fetched in ${Date.now() - configStartTime}ms`);
+        let config = null;
+        try {
+            const configResult = await db.select().from(systemConfig).limit(1);
+            if (configResult && configResult.length > 0) {
+                config = configResult[0];
+            }
+        } catch (configErr) {
+            console.warn(`⚠️ [REG] Could not fetch system_config: ${configErr.message}`);
+            // If the table doesn't exist yet (e.g. fresh DB before initialization), we allow the first registration
+            config = { allowRegistration: true };
+        }
+        console.log(`[REG] Config fetched/defaulted in ${Date.now() - configStartTime}ms`);
 
         if (config && config.allowRegistration === false) {
             return res.status(403).json({
@@ -474,14 +484,18 @@ app.post('/api/auth/register', async (req, res) => {
         console.log('[REG] Registration complete for:', email);
         res.status(201).json({ token, _id: newUser.id, ...newUser });
     } catch (err) {
-        console.error('Registration Error Detailed:', err);
+        console.error('🔥 [FATAL REGISTRATION ERROR] 🔥');
+        console.error('Error Details:', err);
+        console.error('Stack Trace:', err.stack);
+
         // Ensure we send a clean JSON object even if err has circular references
         const errorResponse = {
             message: 'Server error during registration',
             error: err.message || 'Unknown error',
             code: err.code || null,
             detail: err.detail || null,
-            hint: err.hint || null
+            hint: err.hint || null,
+            stack_snippet: err.stack ? err.stack.toString().substring(0, 200) : null
         };
         res.status(500).json(errorResponse);
     }
