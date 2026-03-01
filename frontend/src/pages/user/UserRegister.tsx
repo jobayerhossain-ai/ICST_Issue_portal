@@ -206,11 +206,11 @@ const UserRegister = () => {
                                         <AnimatePresence>
                                             {deptOpen && (
                                                 <motion.div
-                                                    initial={{ opacity: 0, y: -8, scale: 0.96 }}
-                                                    animate={{ opacity: 1, y: 4, scale: 1 }}
-                                                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
-                                                    transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                                                    className="absolute top-full left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border border-slate-200/80 rounded-xl shadow-xl shadow-slate-200/50 overflow-hidden"
+                                                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                    transition={{ duration: 0.2 }}
+                                                    className="absolute z-50 w-full mt-2 bg-white/80 backdrop-blur-xl border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl overflow-hidden"
                                                 >
                                                     <div className="py-1.5">
                                                         {DEPARTMENTS.map((dept, index) => (

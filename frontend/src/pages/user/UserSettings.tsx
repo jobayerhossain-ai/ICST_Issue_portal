@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
-import { User, Lock, Bell, Shield, Save } from 'lucide-react';
+import { User, Lock, Bell, Shield, Save, ChevronDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 const UserSettings = () => {
@@ -12,6 +12,27 @@ const UserSettings = () => {
     // Profile settings state
     const [name, setName] = useState(user?.name || '');
     const [department, setDepartment] = useState(user?.department || '');
+    const [deptOpen, setDeptOpen] = useState(false);
+    const deptRef = useRef<HTMLDivElement>(null);
+
+    const DEPARTMENTS = [
+        { value: 'CST', label: 'CST', full: 'Computer Science Technology' },
+        { value: 'CT', label: 'CT', full: 'Civil Technology' },
+        { value: 'ET', label: 'ET', full: 'Electrical Technology' },
+        { value: 'TT', label: 'TT', full: 'Textile Technology' },
+        { value: 'Architecture', label: 'Architecture', full: 'Architecture' },
+    ];
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (deptRef.current && !deptRef.current.contains(e.target as Node)) {
+                setDeptOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     // Security settings state
     const [currentPassword, setCurrentPassword] = useState('');
@@ -142,21 +163,63 @@ const UserSettings = () => {
                                             <p className="text-xs text-gray-500 mt-1">রোল নাম্বার পরিবর্তন করা যাবে না</p>
                                         </div>
 
-                                        <div>
+                                        <div ref={deptRef} className="relative">
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                                 ডিপার্টমেন্ট
                                             </label>
-                                            <select
-                                                value={department}
-                                                onChange={(e) => setDepartment(e.target.value)}
-                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-transparent"
+                                            <button
+                                                type="button"
+                                                onClick={() => setDeptOpen(!deptOpen)}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg hover:border-primary/50 focus:ring-2 focus:ring-primary/50 focus:border-transparent flex items-center justify-between bg-white transition-all text-left"
                                             >
-                                                <option value="CSE">CSE</option>
-                                                <option value="EEE">EEE</option>
-                                                <option value="CE">CE</option>
-                                                <option value="BBA">BBA</option>
-                                                <option value="English">English</option>
-                                            </select>
+                                                <span className={department ? 'text-gray-900' : 'text-gray-500'}>
+                                                    {DEPARTMENTS.find(d => d.value === department)?.full || 'ডিপার্টমেন্ট নির্বাচন করুন'}
+                                                </span>
+                                                <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${deptOpen ? 'rotate-180' : ''}`} />
+                                            </button>
+
+                                            <AnimatePresence>
+                                                {deptOpen && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                                        transition={{ duration: 0.2 }}
+                                                        className="absolute z-50 w-full mt-2 bg-white/80 backdrop-blur-xl border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-xl overflow-hidden"
+                                                    >
+                                                        <div className="max-h-60 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+                                                            {DEPARTMENTS.map((dept) => (
+                                                                <button
+                                                                    key={dept.value}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setDepartment(dept.value);
+                                                                        setDeptOpen(false);
+                                                                    }}
+                                                                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors ${department === dept.value
+                                                                            ? 'bg-primary/10 text-primary'
+                                                                            : 'hover:bg-black/5 text-gray-700'
+                                                                        }`}
+                                                                >
+                                                                    <div className="flex flex-col items-start gap-1">
+                                                                        <span className="font-semibold">{dept.label}</span>
+                                                                        <span className="text-xs opacity-70 font-normal">{dept.full}</span>
+                                                                    </div>
+                                                                    {department === dept.value && (
+                                                                        <motion.div
+                                                                            initial={{ scale: 0 }}
+                                                                            animate={{ scale: 1 }}
+                                                                            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                                                                        >
+                                                                            <Check className="w-4 h-4 text-primary" />
+                                                                        </motion.div>
+                                                                    )}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </div>
 
                                         <div>
