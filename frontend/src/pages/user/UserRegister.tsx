@@ -75,6 +75,11 @@ const UserRegister = () => {
             toast.success('রেজিস্ট্রেশন সফল! (Registration successful!)');
             navigate('/user/dashboard');
         } catch (err: unknown) {
+            console.error('------- RAW REGISTRATION ERROR -------');
+            console.error(err);
+            console.error('Response Data:', (err as any)?.response?.data);
+            console.error('--------------------------------------');
+
             const error = err as { response?: { data?: { message?: string } } };
             toast.error(error.response?.data?.message || 'রেজিস্ট্রেশন ব্যর্থ (Registration failed)');
         } finally {
