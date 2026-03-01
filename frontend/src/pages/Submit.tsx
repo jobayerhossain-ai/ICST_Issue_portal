@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Upload, MapPin, Tag } from 'lucide-react';
-import { ISSUE_CATEGORIES, FORMSPREE_ENDPOINT } from '@/config/constants';
+import { ISSUE_CATEGORIES } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { Navigate } from 'react-router-dom';
 
 const Submit = () => {
   const { toast } = useToast();
+  const { user, loading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -16,6 +19,10 @@ const Submit = () => {
     evidence: '',
     contactEmail: ''
   });
+
+  if (!loading && !user) {
+    return <Navigate to="/user/login" replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

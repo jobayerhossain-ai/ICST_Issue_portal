@@ -435,20 +435,10 @@ const SALT_ROUNDS = 8; // Optimized for Vercel performance while maintaining sec
 app.post('/api/auth/register', async (req, res) => {
     console.log('[REG] Starting registration for:', req.body.email);
     try {
-        // Check if registration is allowed with a graceful fallback
+        // Check if registration is allowed
         const configStartTime = Date.now();
-        let config = null;
-        try {
-            const configResult = await db.select().from(systemConfig).limit(1);
-            if (configResult && configResult.length > 0) {
-                config = configResult[0];
-            }
-        } catch (configErr) {
-            console.warn(`⚠️ [REG] Could not fetch system_config: ${configErr.message}`);
-            // If the table doesn't exist yet (e.g. fresh DB before initialization), we allow the first registration
-            config = { allowRegistration: true };
-        }
-        console.log(`[REG] Config fetched/defaulted in ${Date.now() - configStartTime}ms`);
+        const config = await db.select().from(systemConfig).limit(1).then(r => r[0]);
+        console.log(`[REG] Config fetched in ${Date.now() - configStartTime}ms`);
 
         if (config && config.allowRegistration === false) {
             return res.status(403).json({
@@ -618,7 +608,7 @@ app.get('/api/issues', async (req, res) => {
     }
 });
 
-app.post('/api/issues', optionalAuthenticateToken, checkMaintenanceMode, async (req, res) => {
+app.post('/api/issues', authenticateToken, checkMaintenanceMode, async (req, res) => {
     try {
         const { title, description, category, priority, imageUrl, location, evidence, contactEmail } = req.body;
         const [issue] = await db.insert(issues).values({
