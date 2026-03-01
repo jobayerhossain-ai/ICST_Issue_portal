@@ -182,11 +182,16 @@ const canSendMessage = (user) => {
             submitted_by UUID REFERENCES users(id),
             views INTEGER DEFAULT 0,
             image_url TEXT,
+            location TEXT,
+            contact_email TEXT,
             expected_resolution TIMESTAMP,
             assigned_to UUID REFERENCES users(id),
             created_at TIMESTAMP DEFAULT NOW(),
             updated_at TIMESTAMP DEFAULT NOW()
         )`);
+
+        // Migration: ensure location and contact_email exist if table was already there
+        await sqlClient(`ALTER TABLE issues ADD COLUMN IF NOT EXISTS location TEXT, ADD COLUMN IF NOT EXISTS contact_email TEXT`);
 
         // 4. Issue Voted Users (Many-to-Many join)
         await sqlClient(`CREATE TABLE IF NOT EXISTS issue_voted_users (
@@ -569,20 +574,22 @@ app.get('/api/issues', async (req, res) => {
     }
 });
 
-app.post('/api/issues', authenticateToken, checkMaintenanceMode, async (req, res) => {
+app.post('/api/issues', optionalAuthenticateToken, checkMaintenanceMode, async (req, res) => {
     try {
-        const { title, description, category, priority, imageUrl } = req.body;
+        const { title, description, category, priority, imageUrl, location, evidence, contactEmail } = req.body;
         const [issue] = await db.insert(issues).values({
             title,
             description,
             category,
             priority: priority || 'medium',
             status: 'pending',
-            submittedBy: req.user.id,
+            submittedBy: req.user ? req.user.id : null,
             votesGood: 0,
             votesBad: 0,
             views: 0,
-            imageUrl: imageUrl || null
+            imageUrl: imageUrl || evidence || null,
+            location: location || null,
+            contactEmail: contactEmail || null
         }).returning();
 
         issue._id = issue.id;
