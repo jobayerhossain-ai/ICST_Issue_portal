@@ -5,11 +5,12 @@ import { ISSUE_CATEGORIES } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const Submit = () => {
   const { toast } = useToast();
   const { user, loading } = useAuth();
+  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -20,13 +21,23 @@ const Submit = () => {
     contactEmail: ''
   });
 
-  if (!loading && !user) {
-    return <Navigate to="/user/login" replace />;
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    if (!loading && !user) {
+      // Store the form data in sessionStorage to automatically submit after login
+      sessionStorage.setItem('pendingSubmit', 'true');
+      sessionStorage.setItem('pendingIssueData', JSON.stringify(formData));
+
+      toast({
+        title: "লগইন প্রয়োজন",
+        description: "সমস্যাটি জমা দিতে আপনাকে প্রথমে লগইন করতে হবে। লগইনের পর এটি স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।",
+      });
+      setIsSubmitting(false);
+      navigate('/user/login');
+      return;
+    }
 
     try {
       await api.post('/issues', formData);

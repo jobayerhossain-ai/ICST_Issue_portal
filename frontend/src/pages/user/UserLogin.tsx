@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import api from '@/services/api';
 
 const UserLogin = () => {
     const navigate = useNavigate();
@@ -27,6 +28,26 @@ const UserLogin = () => {
 
         try {
             await login(formData.email, formData.password);
+
+            // Check for pending issue submission
+            if (sessionStorage.getItem('pendingSubmit') === 'true') {
+                try {
+                    const pendingData = sessionStorage.getItem('pendingIssueData');
+                    if (pendingData) {
+                        const issueData = JSON.parse(pendingData);
+                        await api.post('/issues', issueData);
+                        sessionStorage.removeItem('pendingSubmit');
+                        sessionStorage.removeItem('pendingIssueData');
+                        toast.success('লগইন সফল এবং আপনার সমস্যাটি স্বয়ংক্রিয়ভাবে প্রকাশ করা হয়েছে!');
+                        navigate('/issues');
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Failed to auto-submit issue:", e);
+                    toast.error('অটো-সাবমিশন ব্যর্থ হয়েছে। দয়া করে আবার সমস্যাটি জানান।');
+                }
+            }
+
             toast.success('লগইন সফল! (Login successful!)');
             navigate('/user/dashboard');
         } catch (err: unknown) {
