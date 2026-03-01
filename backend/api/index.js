@@ -128,6 +128,9 @@ const canSendMessage = (user) => {
 // This ensures all tables exist on startup (Crucial for Neon Serverless/Fresh Deployments)
 (async () => {
     try {
+        // 0. Ensure pgcrypto extension exists for gen_random_uuid()
+        await sqlClient(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+
         // 1. Users table (Base table)
         await sqlClient(`CREATE TABLE IF NOT EXISTS users (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -441,7 +444,11 @@ app.post('/api/auth/register', async (req, res) => {
         res.status(201).json({ token, _id: newUser.id, ...newUser });
     } catch (err) {
         console.error('Registration Error:', err);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({
+            message: 'Server error',
+            error: err.message || 'Unknown database error',
+            details: err.detail || null
+        });
     }
 });
 
