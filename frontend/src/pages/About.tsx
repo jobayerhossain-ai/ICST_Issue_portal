@@ -98,28 +98,28 @@ const About = () => {
           <h2 className="text-3xl font-bold text-foreground mb-8 text-center">এটি কিভাবে কাজ করে</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-primary">
+              <div className="w-16 h-16 rounded-full bg-primary border-2 border-primary/50 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-white shadow-lg shadow-primary/20">
                 1
               </div>
               <h4 className="font-semibold text-foreground mb-2">রিপোর্ট</h4>
               <p className="text-sm text-muted-foreground">সমস্যা রিপোর্ট করুন বিস্তারিত তথ্য সহ</p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-blue-100 border-2 border-blue-500 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-blue-600">
+              <div className="w-16 h-16 rounded-full bg-sky-500 border-2 border-sky-600 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-white shadow-lg shadow-sky-200">
                 2
               </div>
               <h4 className="font-semibold text-foreground mb-2">ভোট</h4>
               <p className="text-sm text-muted-foreground">গুরুত্বপূর্ণ সমস্যায় ভোট দিয়ে সমর্থন করুন</p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-orange-100 border-2 border-orange-500 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-orange-600">
+              <div className="w-16 h-16 rounded-full bg-amber-500 border-2 border-amber-600 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-white shadow-lg shadow-amber-200">
                 3
               </div>
               <h4 className="font-semibold text-foreground mb-2">ট্র্যাক</h4>
               <p className="text-sm text-muted-foreground">সমাধান প্রক্রিয়া রিয়েল-টাইমে ট্র্যাক করুন</p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-green-100 border-2 border-green-500 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-green-600">
+              <div className="w-16 h-16 rounded-full bg-green-500 border-2 border-green-600 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-white shadow-lg shadow-green-200">
                 4
               </div>
               <h4 className="font-semibold text-foreground mb-2">সমাধান</h4>
