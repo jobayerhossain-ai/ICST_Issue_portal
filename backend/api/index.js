@@ -125,8 +125,12 @@ const canSendMessage = (user) => {
 // --- ROUTES ---
 
 // --- DATABASE SCHEMA INITIALIZATION ---
-// This ensures all tables exist on startup (Crucial for Neon Serverless/Fresh Deployments)
-(async () => {
+// This ensures all tables exist on startup and prevents race conditions in serverless environments.
+const dbInitializationPromise = (async () => {
+    if (!process.env.DATABASE_URL) {
+        console.error('❌ DATABASE_URL is not defined in environment variables');
+        throw new Error('DATABASE_URL missing');
+    }
     try {
         // 0. Ensure pgcrypto extension exists for gen_random_uuid()
         await sqlClient(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
@@ -225,8 +229,26 @@ const canSendMessage = (user) => {
         console.log('✅ Database Schema verified and tables ready');
     } catch (err) {
         console.error('❌ Database Initialization Error:', err.message);
+        throw err; // Re-throw so the promise stays rejected
     }
 })();
+
+// Middleware to ensure DB is ready before any request
+const ensureDbReady = async (req, res, next) => {
+    try {
+        await dbInitializationPromise;
+        next();
+    } catch (err) {
+        console.error('CRITICAL: Request failed because DB initialization failed:', err.message);
+        res.status(500).json({
+            message: 'Database is starting up or failed to initialize. Please try again in a few seconds.',
+            error: err.message
+        });
+    }
+};
+
+// Apply ensureDbReady to all /api routes
+app.use('/api', ensureDbReady);
 
 // ★ PUSH NOTIFICATION HELPER — sends push to all of a user's subscribed devices
 async function sendPushToUser(userId, payload) {
@@ -448,12 +470,16 @@ app.post('/api/auth/register', async (req, res) => {
 
         res.status(201).json({ token, _id: newUser.id, ...newUser });
     } catch (err) {
-        console.error('Registration Error:', err);
-        res.status(500).json({
-            message: 'Server error',
-            error: err.message || 'Unknown database error',
-            details: err.detail || null
-        });
+        console.error('Registration Error Detailed:', err);
+        // Ensure we send a clean JSON object even if err has circular references
+        const errorResponse = {
+            message: 'Server error during registration',
+            error: err.message || 'Unknown error',
+            code: err.code || null,
+            detail: err.detail || null,
+            hint: err.hint || null
+        };
+        res.status(500).json(errorResponse);
     }
 });
 
