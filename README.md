@@ -1,79 +1,40 @@
-# 🎯 ICST Issue Portal
+# 🎫 ICST Issue Portal — Institutional Ticket Management System
 
-একটি সম্পূর্ণ বাংলা ভাষার সমস্যা রিপোর্টিং ও ট্র্যাকিং সিস্টেম
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/Frontend-React.js-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![Node.js](https://img.shields.io/badge/Backend-Node.js_--_Express-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 
-## 📁 প্রজেক্ট স্ট্রাকচার
+> A centralized institutional support ticket and issue management web portal built for academic/organizational environments. Enables students, faculty, and administrators to report, track, assign, and resolve campus issues efficiently.
 
-```
-neon-voice-board-main/
-├── frontend/        # React + TypeScript Frontend
-├── backend/         # Go + Fiber Backend (Ultra-Fast!)
-└── README.md        # এই ফাইল
-```
+---
 
-## 🚀 দ্রুত শুরু করুন
+## 🎯 Key Features
 
-### Frontend চালান:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Frontend চলবে: `http://localhost:8080`
+- 🎫 **Issue Submission & Categorization**: User-friendly form for logging complaints, technical errors, and maintenance requests.
+- 📊 **Status Dashboard & Tracking**: Real-time progress monitoring (`Open`, `In Progress`, `Resolved`, `Closed`).
+- 🔑 **Role-Based Views**: Tailored interfaces for Applicants, Tech Support, and Administration.
+- ⚡ **RESTful API Backend**: Fast Node.js / Express API server.
 
-### Backend চালান (Go - Super Fast! ⚡):
-```bash
-cd backend
-go run ./cmd/server/main.go
-```
-অথবা compiled binary ব্যবহার করুন:
-```bash
-cd backend
-.\server.exe  # Windows
-./server      # Linux/Mac
-```
-Backend চলবে: `http://localhost:5000`
+---
 
-## 🎨 ফিচারসমূহ
+## 🚀 Local Running
 
-✅ সম্পূর্ণ বাংলা লোকালাইজেশন (Hind Siliguri ফন্ট)
-✅ প্রশ্নবোধক ও ছন্দোবদ্ধ ভাষা
-✅ রিয়েল-টাইম ইস্যু ট্র্যাকিং
-✅ কমিউনিটি ভোটিং সিস্টেম
-✅ মন্তব্য ও রিপ্লাই ফিচার
-✅ Admin প্যানেল  
-✅ User Panel (Register, Login, Dashboard)
-✅ Professional sky blue থিম
-✅ Smooth অ্যানিমেশন
-✅ **World-Class Performance** (Go Backend)
+1. **Backend**:
+   ```bash
+   cd backend
+   npm install
+   npm start
+   ```
 
-## 💻 Tech Stack
+2. **Frontend**:
+   ```bash
+   cd frontend
+   npm install
+   npm start
+   ```
 
-### Frontend:
-- React 18
-- TypeScript
-- Vite
-- Tailwind CSS
-- Framer Motion
-- React Router
+---
 
-### Backend (Go - Ultra Performance! 🚀):
-- **Go 1.25** (Compiled for Speed)
-- **Fiber v2** (Express-like, Zero-Allocation)
-- **BoltDB** (Embedded Key-Value Store)
-- **JWT Authentication**
-- **bcrypt** (Password Hashing)
-- **Gzip Compression**
+## 📄 License
 
-### Performance Highlights:
-- ⚡ **3x faster** than Node.js
-- 💾 **10x less memory** usage
-- 🚀 **20x faster** startup
-- 📦 **Single binary** deployment
-
-## 📖 বিস্তারিত ডকুমেন্টেশন
-
-- [Frontend README](./frontend/README.md)
-- [Backend README](./backend/README.md)
-
-
+MIT License © [Jobayer Hossain](https://github.com/jobayerhossain-ai).
